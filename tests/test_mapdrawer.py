@@ -70,6 +70,69 @@ class TestSetters:
 
 
 # ---------------------------------------------------------------------------
+# crop
+# ---------------------------------------------------------------------------
+
+class TestCrop:
+    """Los bounds tras un recorte deben describir los píxeles que quedaron.
+
+    Si no, todo lo que se dibuje después (costas, estados, grilla) se convierte
+    de lon/lat a píxel con una escala equivocada y sale desplazado.
+    """
+
+    def _mapper(self):
+        # 200x100 px sobre 100°x50°: 2 px por grado en ambos ejes.
+        mapper = MapDrawer()
+        mapper.set_image(_solid_image(w=200, h=100))
+        mapper.set_bounds(-130.0, 50.0, -30.0, 0.0)
+        return mapper
+
+    def test_crop_inside_data_keeps_requested_bounds(self):
+        mapper = self._mapper()
+        mapper.crop(-120.0, 40.0, -50.0, 10.0)
+
+        assert mapper.image.size == (140, 60)
+        assert mapper.bounds['ulx'] == pytest.approx(-120.0)
+        assert mapper.bounds['uly'] == pytest.approx(40.0)
+        assert mapper.bounds['lrx'] == pytest.approx(-50.0)
+        assert mapper.bounds['lry'] == pytest.approx(10.0)
+
+    def test_crop_past_east_edge_clamps_bounds_to_data(self):
+        # El caso real: recortes definidos para GOES-19 (a1, atlantic) pedidos
+        # sobre una imagen de GOES-18, que no llega tan al este.
+        mapper = self._mapper()
+        mapper.crop(-120.0, 40.0, -10.0, 10.0)
+
+        # La imagen se topa con el borde este, y los bounds deben decirlo.
+        assert mapper.image.size == (180, 60)
+        assert mapper.bounds['lrx'] == pytest.approx(-30.0)
+        assert mapper.bounds['ulx'] == pytest.approx(-120.0)
+
+    def test_crop_past_every_edge_clamps_to_full_extent(self):
+        mapper = self._mapper()
+        mapper.crop(-200.0, 80.0, 20.0, -40.0)
+
+        assert mapper.image.size == (200, 100)
+        assert mapper.bounds['ulx'] == pytest.approx(-130.0)
+        assert mapper.bounds['uly'] == pytest.approx(50.0)
+        assert mapper.bounds['lrx'] == pytest.approx(-30.0)
+        assert mapper.bounds['lry'] == pytest.approx(0.0)
+
+    def test_clamped_crop_does_not_move_geography(self):
+        # La invariante que fallaba: un punto conocido debe caer en el mismo
+        # píxel de la imagen antes y después del recorte, salvo el desplazamiento
+        # del borde izquierdo. Es lo que hace que las costas calcen con la imagen.
+        mapper = self._mapper()
+        u_full, v_full = mapper._geo2pixel(-60.0, 20.0)
+
+        # El recorte empieza en -120°, o sea 10° (20 px) a la derecha de -130°.
+        mapper.crop(-120.0, 40.0, -10.0, 10.0)
+        u_crop, v_crop = mapper._geo2pixel(-60.0, 20.0)
+
+        assert (u_crop, v_crop) == (u_full - 20, v_full - 20)
+
+
+# ---------------------------------------------------------------------------
 # draw_fecha
 # ---------------------------------------------------------------------------
 

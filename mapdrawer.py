@@ -469,6 +469,25 @@ class MapDrawer:
 
         debug_msg(f"Calculando recorte para: {ulx}, {uly}, {lrx}, {lry}")
 
+        # La región pedida puede rebasar los datos disponibles (p.ej. un recorte
+        # definido para GOES-19 aplicado a una imagen de GOES-18). Hay que ajustarla
+        # a la extensión real ANTES de pasar a píxeles: el recorte en píxeles se topa
+        # con el borde de la imagen de todos modos, y si los bounds conservaran la
+        # región pedida quedarían describiendo píxeles que no existen, desplazando
+        # todo lo que se dibuje después.
+        b = self.bounds
+        if not (b['ulx'] == b['uly'] == b['lrx'] == b['lry'] == 0):
+            x_lo, x_hi = sorted((b['ulx'], b['lrx']))
+            y_lo, y_hi = sorted((b['lry'], b['uly']))
+
+            clipped = (min(max(ulx, x_lo), x_hi), min(max(uly, y_lo), y_hi),
+                       min(max(lrx, x_lo), x_hi), min(max(lry, y_lo), y_hi))
+
+            if clipped != (ulx, uly, lrx, lry):
+                debug_msg(f"Región fuera de los datos disponibles; ajustada a: "
+                          f"{clipped[0]}, {clipped[1]}, {clipped[2]}, {clipped[3]}")
+                ulx, uly, lrx, lry = clipped
+
         # Convertir coordenadas geográficas a píxeles
         res1 = self._geo2pixel(ulx, uly)
         res2 = self._geo2pixel(lrx, lry)
