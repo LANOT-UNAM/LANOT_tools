@@ -64,14 +64,11 @@ echo "  ✓ Código fuente copiado a ${SRC_DIR}"
 # Paso 4: Instalar recursos (CPTs)
 echo -e "${YELLOW}[4/7] Instalando recursos compartidos...${NC}"
 mkdir -p "${CPT_DIR}"
-if ls "${SCRIPT_DIR}"/*.cpt >/dev/null 2>&1; then
-    cp "${SCRIPT_DIR}"/*.cpt "${CPT_DIR}/"
-    echo "  ✓ Tablas de color (.cpt) copiadas a ${CPT_DIR}"
-elif [ -d "${SCRIPT_DIR}/colortables" ]; then
-    cp -r "${SCRIPT_DIR}/colortables/"* "${CPT_DIR}/"
-    echo "  ✓ Tablas de color copiadas desde colortables/ a ${CPT_DIR}"
+if ls "${SCRIPT_DIR}/colortables/"*.cpt >/dev/null 2>&1; then
+    cp "${SCRIPT_DIR}/colortables/"*.cpt "${CPT_DIR}/"
+    echo "  ✓ Tablas de color (.cpt) copiadas desde colortables/ a ${CPT_DIR}"
 else
-    echo "  - No se encontraron archivos .cpt en origen, omitiendo copia."
+    echo "  - No se encontraron archivos .cpt en colortables/, omitiendo copia."
 fi
 
 # Paso 5: Crear/actualizar virtualenv
