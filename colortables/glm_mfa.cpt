@@ -1,0 +1,28 @@
+# glm_mfa.cpt
+# GLM Minimum Flash Area: minimo del area de flash sobre la ventana de 5 min.
+# UNIT = km2
+# COLOR_MODEL = RGB
+#
+# PALETA INVERTIDA A PROPOSITO. Es el punto entero del producto:
+#   area pequena (amarillo/verde) = conveccion fortaleciendose
+#   area grande  (azul/purpura)   = conveccion debilitandose / estratiforme
+# Si la imagen sale con el gradiente al reves, la paleta no quedo invertida.
+#
+# Formato: la primera columna es el NUMERO DE INTERVALO y la etiqueta tras ';'
+# es el borde inferior del intervalo en unidades fisicas. Los quiebres estan
+# espaciados logaritmicamente; ver cpt_grid_breaks() en glm_renderer.py.
+#
+# Quiebres calibrados con la ventana 01:40-01:44 UTC del DOY 212 de 2026:
+# min = 64.9, p50 = 523, p90 = 2175, p99 = 4033, max = 5739.
+#
+# Intervalo  R    G    B    ; Valor
+0    255  255  120   ; 100
+1    230  240   60   ; 200
+2    170  220   60   ; 400
+3     90  200   70   ; 700
+4     40  180  130   ; 1100
+5     30  160  190   ; 1600
+6     30  120  210   ; 2200
+7     45   80  200   ; 3000
+8     85   55  175   ; 4000
+9    110   40  130   ; 5500

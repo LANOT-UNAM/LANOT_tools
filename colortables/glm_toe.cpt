@@ -1,0 +1,30 @@
+# glm_toe.cpt
+# GLM Total Optical Energy acumulada en 5 min (5 archivos GLMF de 1 min).
+# UNIT = fJ
+# COLOR_MODEL = RGB
+#
+# OJO CON LAS UNIDADES: el NetCDF entrega total_energy en nanojoules, pero los
+# valores son ilegibles en esa unidad (p50 = 1.2e-06 nJ). Esta paleta se rotula
+# en FEMTOJOULES, como la literatura del GLM; render_glm_grid_layer multiplica
+# el dato por 1e6 (nJ -> fJ) antes del lookup (GRID_SCALE en glm_renderer.py).
+#
+# Formato: la primera columna es el NUMERO DE INTERVALO y la etiqueta tras ';'
+# es el borde inferior del intervalo en unidades fisicas. Los quiebres estan
+# espaciados logaritmicamente; ver cpt_grid_breaks() en glm_renderer.py.
+#
+# Quiebres calibrados con la ventana 01:40-01:44 UTC del DOY 212 de 2026,
+# convertidos a fJ: p50 = 1.2, p90 = 25, p95 = 49, p99 = 190, max = 15000.
+#
+# Escala de brillo: purpura oscuro -> naranja -> blanco.
+#
+# Intervalo  R    G    B    ; Valor
+0     40   10   70   ; 0.1
+1     75   15  110   ; 0.3
+2    115   25  130   ; 1
+3    155   40  120   ; 3
+4    195   60   95   ; 10
+5    225   95   60   ; 30
+6    245  140   35   ; 100
+7    252  185   55   ; 300
+8    253  225  130   ; 1000
+9    255  250  220   ; 3000
