@@ -177,6 +177,19 @@ GOES_CONUS_EXTENT_METERS = {
 GLOBAL_LANOT_DIR = "/usr/local/share/lanot"
 
 
+def resolve_cpt_path(cpt_path):
+    """Resuelve un CPT relativo contra el directorio global de paletas.
+
+    Devuelve la ruta tal cual si existe; si no, busca el mismo nombre de
+    archivo en <GLOBAL_LANOT_DIR>/colortables.
+    """
+    if not cpt_path or os.path.exists(cpt_path):
+        return cpt_path
+    global_path = os.path.join(GLOBAL_LANOT_DIR, "colortables",
+                               os.path.basename(cpt_path))
+    return global_path if os.path.exists(global_path) else cpt_path
+
+
 class MapDrawer:
     def __init__(self, lanot_dir=GLOBAL_LANOT_DIR, target_crs=None):
         """
@@ -1037,6 +1050,50 @@ class MapDrawer:
         debug_msg(f"overlay_glm: capa compuesta. Rango: "
                   f"{metadata.get('glm_time_start')} – {metadata.get('glm_time_end')}")
 
+    def overlay_glm_grid(self, glm_files, metadata, product='FED',
+                         cpt_obj=None, min_fed=0.1):
+        """
+        Compone una capa de un producto GLM grillado (FED/MFA/TOE) sobre self.image.
+
+        Espejo cuantitativo de overlay_glm(): en lugar del glow de eventos del
+        L2 LCFA, acumula los archivos GLMF de la ventana y los colorea por valor
+        físico con `cpt_obj`. Requiere que set_image() y set_bounds() hayan sido
+        llamados previamente. Almacena el rango temporal de la ventana en el
+        objeto metadata como 'glm_time_start' y 'glm_time_end'.
+
+        Args:
+            glm_files (list[str]): Rutas a los NetCDF GLMF de la ventana.
+            metadata: Instancia de Metadata con 'crs' y 'bounds'.
+            product (str): 'FED', 'MFA' o 'TOE'.
+            cpt_obj (ColorPaletteTable): paleta indexada por intervalo
+                (colortables/glm_*.cpt).
+            min_fed (float): FED acumulado mínimo para pintar una celda.
+        """
+        if self.image is None:
+            print("Error overlay_glm_grid: imagen no establecida.", file=sys.stderr)
+            return
+
+        try:
+            from glm_renderer import render_glm_grid_layer
+        except ImportError as e:
+            print(f"Error: no se pudo cargar glm_renderer ({e}). "
+                  "Asegúrate de que glm_renderer.py y sus dependencias (rasterio, netCDF4) estén instaladas.", file=sys.stderr)
+            return
+
+        metadata['image_size'] = (self.image.width, self.image.height)
+
+        glm_layer = render_glm_grid_layer(glm_files, metadata, product=product,
+                                          cpt_obj=cpt_obj, min_fed=min_fed)
+        if glm_layer is None:
+            print("Advertencia: overlay_glm_grid no generó capa (sin datos o error).",
+                  file=sys.stderr)
+            return
+
+        self.image = Image.alpha_composite(
+            self.image.convert('RGBA'), glm_layer).convert('RGB')
+        debug_msg(f"overlay_glm_grid: {product} compuesto. Rango: "
+                  f"{metadata.get('glm_time_start')} – {metadata.get('glm_time_end')}")
+
     def parse_cpt(self, cpt_path):
         """
         Parsea un archivo CPT y devuelve una lista de items para la leyenda.
@@ -1192,7 +1249,24 @@ def main():
                         choices=["yellow", "magenta", "white"],
                         help="Color base de los rayos GLM (default: yellow).")
 
+    # GLM grillado (productos GLMF: FED / MFA / TOE)
+    parser.add_argument("--glm-grid", nargs='+', metavar="FILE",
+                        help="Archivos NetCDF GLM grillados (GLMF) a acumular y "
+                             "sobreponer. Requiere --cpt con una paleta glm_*.cpt.")
+    parser.add_argument("--glm-product", default="FED",
+                        choices=["FED", "MFA", "TOE"],
+                        help="Producto grillado a renderizar (default: FED).")
+    parser.add_argument("--glm-min-fed", type=float, default=0.1,
+                        help="FED acumulado mínimo para pintar una celda "
+                             "(default: 0.1). Aplica también a MFA y TOE, que se "
+                             "enmascaran con el FED de la misma ventana.")
+
     args = parser.parse_args()
+
+    if args.glm and args.glm_grid:
+        parser.error("--glm y --glm-grid son mutuamente excluyentes: "
+                     "el primero sobrepone eventos del L2 LCFA y el segundo "
+                     "un producto grillado GLMF.")
 
     global VERBOSE
     VERBOSE = args.verbose
@@ -1400,6 +1474,18 @@ def main():
         }
         glm_color = GLM_COLOR_MAP.get(args.glm_color, (255, 255, 0))
         mapper.overlay_glm(args.glm, metadata, color=glm_color)
+    elif args.glm_grid:
+        if not HAS_CPT:
+            print("Error: --glm-grid requiere colorpalettetable.", file=sys.stderr)
+        elif not args.cpt:
+            print(f"Error: --glm-grid requiere --cpt (ej. "
+                  f"glm_{args.glm_product.lower()}.cpt).", file=sys.stderr)
+        else:
+            grid_cpt = ColorPaletteTable(resolve_cpt_path(args.cpt))
+            mapper.overlay_glm_grid(args.glm_grid, metadata,
+                                    product=args.glm_product,
+                                    cpt_obj=grid_cpt,
+                                    min_fed=args.glm_min_fed)
 
     # 6. Dibujar capas
     if args.layer and bounds_set:
@@ -1540,11 +1626,7 @@ def main():
             # Prioridad 2: --cpt externo (el usuario lo pidió explícitamente)
             if cpt_obj is None and args.cpt:
                 try:
-                    cpt_path = args.cpt
-                    if not os.path.exists(cpt_path):
-                        global_path = os.path.join(GLOBAL_LANOT_DIR, "colortables", os.path.basename(cpt_path))
-                        if os.path.exists(global_path):
-                            cpt_path = global_path
+                    cpt_path = resolve_cpt_path(args.cpt)
                     cpt_obj = ColorPaletteTable(cpt_path)
                     debug_msg(f"Colorbar: usando paleta externa {cpt_path}.")
                 except Exception as e:

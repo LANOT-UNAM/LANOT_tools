@@ -38,7 +38,7 @@ The system has two CLI entry points and four importable library modules:
 ### Library Modules
 - **`metadata.py`** (`Metadata` class) — Dict-like container for CRS, bounds, timestamp, satellite name. Factory methods: `Metadata.from_rasterio(src)`, `Metadata.from_json_file(path)`, `Metadata.from_dict(data)`. Key helper: `get_mapdrawer_bounds()` converts rasterio (left, bottom, right, top) to MapDrawer (ulx, uly, lrx, lry) format.
 - **`colorpalettetable.py`** (`ColorPaletteTable`) — GMT-style CPT file parser. Supports continuous and discrete palettes, special values (B/F/N), and colormaps embedded in GeoTIFF tags (used by CSPP VIIRS ATMOS products).
-- **`glm_renderer.py`** — Renders GLM (Geostationary Lightning Mapper) NetCDF files as RGBA density layers. Used by `mapdrawer` via `--glm` or standalone.
+- **`glm_renderer.py`** — Renders GLM (Geostationary Lightning Mapper) NetCDF files as RGBA layers. Two independent modes: `render_glm_layer()` draws a qualitative glow from L2 LCFA events (`mapdrawer --glm`, or standalone); `render_glm_grid_layer()` accumulates gridded GLMF products (FED/MFA/TOE) over a multi-minute window and colors them by physical value with a CPT (`mapdrawer --glm-grid`). See `plan_glm_grid.md`.
 - **`ash_view_generator.py`** — Composites a volcanic ash detection GeoTIFF (uint8 + embedded colormap) onto a base ABI image with georeferenced alignment.
 
 ### Key Design Patterns
@@ -48,6 +48,8 @@ The system has two CLI entry points and four importable library modules:
 **Layer system** — `--layer NAME:COLOR:WIDTH[:labels]` syntax. Predefined names: `COASTLINE`, `COUNTRIES`, `MEXSTATES`, and `gridN` (lat/lon grid at N° intervals). Vector data loaded from `/usr/local/share/lanot/gpkg/` (installed) or local path (dev). Layers are drawn in CLI argument order.
 
 **Colorbar from GeoTIFF** — `mapdrawer --colorbar` reads the `colormap` metadata tag embedded by CSPP VIIRS ATMOS. Falls back to `--cpt FILE` if no embedded colormap. Units (K, m, etc.) are auto-detected from filenames like `CldTopTemp`, `CldTopHght`.
+
+**Log-scale CPTs** — `ColorPaletteTable` builds a 256-entry LUT that is *linear in value*, and its discrete parser truncates breakpoints to `int`. Neither form can express log-spaced breaks in physical units. The `glm_*.cpt` palettes work around this by indexing on **interval number** (0, 1, 2, …) and carrying the physical lower edge of each interval in the `;` label; `glm_renderer.cpt_grid_breaks()` reads them back. This keeps the log scale in the CPT rather than in code, and the colorbar labels come out in physical units for free.
 
 **Metadata JSON sidecar** — For non-GeoTIFF images, pass georeferencing via `--metadata file.json` with keys: `crs`, `bounds` `[minx, miny, maxx, maxy]`, `timestamp`, `satellite`.
 
