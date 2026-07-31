@@ -430,12 +430,16 @@ class Metadata:
         if 'satellite' in self:
             parts.append(self['satellite'])
 
+        # Etiqueta GLM, con producto grillado (FED/MFA/TOE) si está disponible
+        glm_product = self.get('glm_product')
+        glm_label = f"GLM {glm_product}" if glm_product else "GLM"
+
         # Añadir banda/producto ABI si está disponible
         sensor_product = self.get('product') or self.get('band')
         if sensor_product:
-            parts.append(f"ABI {sensor_product} / GLM")
+            parts.append(f"ABI {sensor_product} / {glm_label}")
         else:
-            parts.append("ABI / GLM")
+            parts.append(f"ABI / {glm_label}")
 
         # Fecha base del ABI
         if 'timestamp' in self:

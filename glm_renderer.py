@@ -512,6 +512,8 @@ def render_glm_grid_layer(files, metadata, product='FED', cpt_obj=None,
         return None
     data, fed, src_crs, src_transform, (t0, t1) = acc
 
+    metadata['glm_product'] = product
+
     if t0 is not None and t1 is not None:
         metadata['glm_time_start'] = t0.strftime("%Y:%m:%d %H:%M:%S")
         metadata['glm_time_end'] = t1.strftime("%Y:%m:%d %H:%M:%S")

@@ -272,6 +272,20 @@ class TestFormatTimestampGlm:
         assert '19:15' in result
         assert '19:30' in result
 
+    def test_contains_glm_product(self):
+        m = self._meta_with_glm()
+        m['glm_product'] = 'TOE'
+        result = m.format_timestamp_glm()
+        assert 'GLM TOE' in result
+
+    def test_no_glm_product_plain_glm_label(self):
+        m = self._meta_with_glm()
+        result = m.format_timestamp_glm()
+        # Sin glm_product la etiqueta es sólo "GLM", sin sufijo de producto
+        assert '/ GLM' in result
+        for prod in ('FED', 'MFA', 'TOE'):
+            assert prod not in result
+
     def test_same_start_end_no_dash(self):
         m = Metadata(
             satellite='GOES-18',
