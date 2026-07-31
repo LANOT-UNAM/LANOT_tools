@@ -1,0 +1,7 @@
+# Dependencias solo de desarrollo. NO las instala install.sh en el servidor:
+# requirements.txt e install_requires de setup.py son los de ejecución.
+#
+#   pip install -r requirements-dev.txt
+#
+-r requirements.txt
+pytest

@@ -21,11 +21,25 @@ python3 -m pytest tests/test_mapdrawer.py::TestClass::test_name -v
 # Development install (edits take effect immediately)
 pip install -e .
 
+# Dev dependencies (pytest); not installed by install.sh
+pip install -r requirements-dev.txt
+
 # Server install
 sudo ./install.sh
 ```
 
 Note: use `python3`, not `python` — `python` is not in PATH.
+
+Note: the test suite needs `pytest` **and** the full runtime deps in the *same* interpreter. It does not degrade gracefully — a missing `fiona`, `rasterio` or `netCDF4` aborts collection with `ModuleNotFoundError` before a single test runs, even though the tools themselves treat those as optional at runtime.
+
+On a server-installed machine the only interpreter with the runtime deps is the venv at `/opt/lanot-tools/venv`, which is root-owned, so pytest has to be added there explicitly:
+
+```bash
+sudo /opt/lanot-tools/venv/bin/pip install pytest
+/opt/lanot-tools/venv/bin/python -m pytest tests/
+```
+
+Expected on a healthy checkout: 114 passed, 33 skipped. The 33 skips are tests whose sample data or CPT files aren't in the repo, not missing dependencies.
 
 ## Architecture
 

@@ -15,6 +15,10 @@ setup(
         "netCDF4",
         "scipy",
     ],
+    extras_require={
+        # Solo desarrollo; install.sh no las instala en el servidor.
+        "dev": ["pytest"],
+    },
     python_requires=">=3.8",
     entry_points={
         'console_scripts': [
