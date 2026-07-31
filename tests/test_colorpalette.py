@@ -17,7 +17,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from colorpalettetable import ColorPaletteTable
 
-REPO_DIR = os.path.join(os.path.dirname(__file__), '..')
+REPO_DIR = os.path.join(os.path.dirname(__file__), '..', 'colortables')
 
 # Rutas a los CPT incluidos en el repo
 CPT_FILES = [

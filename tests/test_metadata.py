@@ -112,7 +112,7 @@ class TestSerialization:
 
     def test_from_json_file_real(self):
         """Carga el sidecar JSON que ya existe en el repo."""
-        repo_json = os.path.join(os.path.dirname(__file__), '..', '20260410_1927_G18_m1.json')
+        repo_json = os.path.join(os.path.dirname(__file__), 'data', 'hpsv_G18_m1_2026100_1930_output_C13.json')
         if not os.path.exists(repo_json):
             pytest.skip("Archivo JSON de ejemplo no encontrado en el repo")
         m = Metadata.from_json_file(repo_json)
