@@ -37,16 +37,25 @@ if [ -d "$FIRE_DIR" ]; then
     done < <(find "$FIRE_DIR" -maxdepth 1 -type f -name "*confidence_cat*.tif" -mmin -60 -print0)
 fi
 
+# Asci: AOD550 (aerosoles). Solo *.tif; los *.nc de la misma carpeta se ignoran.
+ASCI_DIR="${SOURCE_DIR}/asci"
+if [ -d "$ASCI_DIR" ]; then
+    while IFS= read -r -d '' file; do
+        FILES+=("$file")
+    done < <(find "$ASCI_DIR" -maxdepth 1 -type f -name "*AOD550*.tif" -mmin -60 -print0)
+fi
+
 # 2. y 3. Procesar archivos
 echo "Iniciando procesamiento de ${#FILES[@]} archivos..."
 
 for filepath in "${FILES[@]}"; do
     filename=$(basename "$filepath")
     
-    # Determinar paleta y directorio de salida
+    # Determinar paleta, directorio de salida y herramienta
     paleta=""
     outdir=""
-    
+    herramienta="geotiff2view"
+
     if [[ "$filename" == *"cloud_type"* ]]; then
         paleta="cloud_type.cpt"
         outdir="clouds"
@@ -68,6 +77,13 @@ for filepath in "${FILES[@]}"; do
     elif [[ "$filename" == *"confidence_cat"* ]]; then
         paleta="viirs_confidence_cat.cpt"
         outdir="fires"
+    elif [[ "$filename" == *"AOD550"* ]]; then
+        # El TIFF ya viene coloreado con su paleta interna: no se recolorea,
+        # solo se decora. El CPT es el respaldo de la colorbar por si el
+        # archivo llegara sin el tag 'colormap' embebido.
+        paleta="aod550.cpt"
+        outdir="aerosols"
+        herramienta="mapdrawer"
     else
         continue
     fi
@@ -86,12 +102,19 @@ for filepath in "${FILES[@]}"; do
         --timestamp-pos 1
         --font-color white
         -s 0.5
-        -b
         -j
     )
-    
-    if [ -n "$paleta" ]; then
-        args+=("-p" "$paleta" "--lat-south" "11")
+
+    if [ "$herramienta" = "mapdrawer" ]; then
+        # mapdrawer no recolorea: dibuja la colorbar a partir del colormap
+        # embebido en el TIFF (--cpt solo actúa como respaldo).
+        args+=("--colorbar" "--cpt" "$paleta" "--lat-south" "11")
+    else
+        # -b es exclusivo de geotiff2view
+        args+=("-b")
+        if [ -n "$paleta" ]; then
+            args+=("-p" "$paleta" "--lat-south" "11")
+        fi
     fi
 
     # Nombre de salida (tif -> jpg)
@@ -103,9 +126,9 @@ for filepath in "${FILES[@]}"; do
         continue
     fi
 
-    # Ejecutar geotiff2view
+    # Ejecutar la herramienta correspondiente
     echo "Generando: $FULL_DEST_DIR/$outfilename"
-    geotiff2view "$filepath" "${args[@]}" -o "$FULL_DEST_DIR/$outfilename"
+    "$herramienta" "$filepath" "${args[@]}" -o "$FULL_DEST_DIR/$outfilename"
 done
 
 echo "Proceso completado."

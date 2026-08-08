@@ -24,15 +24,20 @@ from datetime import datetime
 from colorpalettetable import ColorPaletteTable
 from metadata import Metadata
 try:
-    from mapdrawer import MapDrawer
+    from mapdrawer import MapDrawer, make_south_room
 except ImportError as e:
     # Fallback si el nombre del archivo o path varía
     try:
         import MapDrawer as md
         MapDrawer = md.MapDrawer
+        make_south_room = md.make_south_room
     except ImportError:
         # Si falla, mostramos el error original
         print(f"Advertencia: No se pudo importar MapDrawer. Detalle: {e}\n(Se omitirán las decoraciones de mapa)", file=sys.stderr)
+
+        def make_south_room(img, metadata, lat_south, compress=False, n_idx=None):
+            """Sin MapDrawer no hay colorbar para la que hacer espacio: no-op."""
+            return img, metadata
 
 # Intentamos importar rasterio para lectura avanzada de GeoTIFF
 try:
@@ -287,81 +292,6 @@ def calculate_size(value, ref_size, default=0):
         return int(val)
     except ValueError:
         return default
-
-def make_south_room(img, metadata, lat_south, compress=False, n_idx=None):
-    """
-    Crea espacio vacío en la parte inferior de la imagen extendiendo los bounds al sur.
-
-    Cuando el borde sur de los datos está al norte de lat_south, libera pad_px filas
-    en la parte inferior de la imagen (para colorbar u otros elementos) sin cambiar
-    el tamaño total. Los metadatos de bounds se actualizan para mantenerse en sincronía
-    con los píxeles, garantizando una georreferencia correcta en MapDrawer.
-
-    Modos:
-      compress=False (default): Recorta pad_px filas del norte y las reemplaza por
-          espacio vacío al sur. El norte visible se desplaza hacia el sur.
-      compress=True: Comprime los datos al alto disponible (H - pad_px) y añade
-          el espacio vacío al sur. El norte se preserva exactamente.
-
-    Solo actúa si bounds están disponibles y el borde sur está al norte de lat_south.
-    """
-    import math
-
-    bounds = metadata.get('bounds')
-    if bounds is None:
-        return img, metadata
-
-    left, bottom, right, top = bounds
-    if bottom <= lat_south:
-        return img, metadata
-
-    W, H = img.size
-    dpp = (top - bottom) / H  # grados por píxel
-    pad_px = math.ceil((bottom - lat_south) / dpp)
-
-    if pad_px <= 0 or pad_px >= H:
-        return img, metadata
-
-    debug_msg(f"make_south_room: bottom={bottom:.4f}, lat_south={lat_south}, pad_px={pad_px}, compress={compress}")
-
-    # Valor de relleno para filas vacías
-    if img.mode == 'RGBA':
-        fill = (0, 0, 0, 0)
-    elif img.mode == 'RGB':
-        fill = (0, 0, 0)
-    else:  # L, P
-        fill = n_idx if n_idx is not None else 0
-
-    new_img = Image.new(img.mode, (W, H), fill)
-
-    if compress:
-        resample = Image.Resampling.NEAREST if img.mode == 'P' else Image.Resampling.LANCZOS
-        small = img.resize((W, H - pad_px), resample)
-        new_img.paste(small, (0, 0))
-        new_top = top
-        new_bottom = lat_south
-    else:
-        # Cortar pad_px filas del norte, pegarlas vacías al sur
-        cropped = img.crop((0, pad_px, W, H))
-        new_img.paste(cropped, (0, 0))
-        new_top = top - pad_px * dpp
-        new_bottom = bottom - pad_px * dpp  # ≈ lat_south
-
-    metadata['bounds'] = (left, new_bottom, right, new_top)
-
-    if 'nodata_mask' in metadata:
-        mask = metadata['nodata_mask']
-        new_mask = np.ones((H, W), dtype=bool)
-        if compress:
-            mask_img = Image.fromarray((mask * 255).astype(np.uint8))
-            mask_small = mask_img.resize((W, H - pad_px), Image.Resampling.NEAREST)
-            new_mask[:H - pad_px, :] = np.array(mask_small) > 127
-        else:
-            new_mask[:H - pad_px, :] = mask[pad_px:H, :]
-        metadata['nodata_mask'] = new_mask
-
-    return new_img, metadata
-
 
 def main():
     global VERBOSE

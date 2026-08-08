@@ -17,7 +17,7 @@ import pytest
 from PIL import Image
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from mapdrawer import MapDrawer
+from mapdrawer import MapDrawer, make_south_room
 from metadata import Metadata
 
 
@@ -281,3 +281,65 @@ class TestOverlayGlm:
                 mapper.overlay_glm(['fake.nc'], meta)
             except ImportError:
                 pytest.fail("overlay_glm lanzó ImportError en lugar de manejarlo")
+
+
+# ---------------------------------------------------------------------------
+# make_south_room
+# ---------------------------------------------------------------------------
+
+def _meta_geo(bottom=20.0, top=40.0):
+    """Metadata con bounds geográficos (left, bottom, right, top)."""
+    return Metadata(crs='EPSG:4326', bounds=(-120.0, bottom, -100.0, top))
+
+
+class TestMakeSouthRoom:
+    def test_noop_si_el_sur_ya_alcanza_la_latitud(self):
+        """Si el borde sur ya está al sur de lat_south no se toca nada."""
+        img = _solid_image(w=100, h=200)
+        meta = _meta_geo(bottom=5.0)
+        out, out_meta = make_south_room(img, meta, lat_south=11.0)
+        assert out is img
+        assert tuple(out_meta['bounds']) == (-120.0, 5.0, -100.0, 40.0)
+
+    def test_noop_sin_bounds(self):
+        img = _solid_image(w=100, h=200)
+        out, out_meta = make_south_room(img, Metadata(crs='EPSG:4326'), lat_south=11.0)
+        assert out is img
+
+    def test_desplaza_conserva_tamano_y_escala(self):
+        """Modo por defecto: mismo tamaño y los mismos grados por píxel."""
+        img = _solid_image(w=100, h=200)
+        meta = _meta_geo(bottom=20.0, top=40.0)  # 0.1 grados/píxel
+        out, out_meta = make_south_room(img, meta, lat_south=11.0)
+
+        assert out.size == img.size
+        left, bottom, right, top = out_meta['bounds']
+        assert (left, right) == (-120.0, -100.0)
+        assert bottom == pytest.approx(11.0, abs=0.1)
+        assert (top - bottom) / out.height == pytest.approx(0.1, rel=1e-6)
+
+    def test_desplaza_deja_vacio_el_sur(self):
+        """Las filas liberadas abajo quedan en el color de relleno."""
+        img = _solid_image(w=100, h=200, color=(50, 50, 50))
+        out, _ = make_south_room(img, _meta_geo(), lat_south=11.0)
+        arr = np.array(out)
+        assert (arr[-1] == 0).all()
+        assert (arr[0] == 50).all()
+
+    def test_comprime_preserva_el_norte(self):
+        """Con compress=True el borde norte no se mueve y el sur baja a lat_south."""
+        img = _solid_image(w=100, h=200)
+        out, out_meta = make_south_room(img, _meta_geo(), lat_south=11.0, compress=True)
+
+        assert out.size == img.size
+        left, bottom, right, top = out_meta['bounds']
+        assert top == 40.0
+        assert bottom == 11.0
+
+    def test_noop_si_el_relleno_no_cabe(self):
+        """Si el espacio pedido excede la imagen se devuelve sin cambios."""
+        img = _solid_image(w=100, h=200)
+        meta = _meta_geo(bottom=20.0, top=40.0)
+        out, out_meta = make_south_room(img, meta, lat_south=-100.0)
+        assert out is img
+        assert tuple(out_meta['bounds']) == (-120.0, 20.0, -100.0, 40.0)

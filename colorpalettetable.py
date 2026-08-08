@@ -219,37 +219,49 @@ class ColorPaletteTable:
             except ValueError:
                 continue
 
-        # Detectar si la paleta es continua o discreta inspeccionando las fronteras entre pares.
-        # Si el valor final de un par coincide exactamente con el valor inicial del siguiente,
-        # hay una frontera compartida → paleta continua (puntos de control con gradiente).
-        # Si hay una brecha numérica (como 0.5000 → 0.5001), cada par es un bloque plano → discreta.
-        is_continuous = False
-        if len(rows) >= 4:
-            # Comprobar la primera frontera entre el par 0-1 y el par 2-3
-            is_continuous = math.isclose(rows[1][0], rows[2][0], rel_tol=1e-6)
-
         obj.segments = []
-        if is_continuous:
-            # Paleta continua: un punto de control por par (el cabezal), más el último valor.
+
+        def add_segment(a, b):
+            """Agrega el segmento a→b normalizando el orden (val_bajo primero)."""
+            va, ra, ga, ba = a
+            vb, rb, gb, bb = b
+            if va < vb:
+                obj.segments.append((va, ra, ga, ba, vb, rb, gb, bb))
+            else:
+                obj.segments.append((vb, rb, gb, bb, va, ra, ga, ba))
+
+        # El tag aparece en dos familias de formatos:
+        #   (a) Dos líneas por segmento (CSPP VIIRS ATMOS). La frontera entre un
+        #       par y el siguiente es un salto nulo o mínimo (0.5000 → 0.5001),
+        #       en todo caso despreciable frente al ancho del propio segmento.
+        #   (b) Una línea por punto de control (VIIRS ASCI AOD550), donde los
+        #       valores avanzan de forma pareja y no hay fronteras pegadas.
+        es_por_pares = False
+        if len(rows) >= 4 and len(rows) % 2 == 0:
+            anchos = [abs(rows[i + 1][0] - rows[i][0])
+                      for i in range(0, len(rows), 2)]
+            fronteras = [abs(rows[i + 1][0] - rows[i][0])
+                         for i in range(1, len(rows) - 1, 2)]
+            ancho_max = max(anchos)
+            es_por_pares = ancho_max > 0 and max(fronteras) <= 0.01 * ancho_max
+
+        if not es_por_pares:
+            # (b) Puntos de control sueltos: cada línea consecutiva define un
+            #     segmento con gradiente.
+            for i in range(len(rows) - 1):
+                add_segment(rows[i], rows[i + 1])
+        elif math.isclose(rows[1][0], rows[2][0], rel_tol=1e-6):
+            # (a) continua: frontera compartida exacta entre pares. Se toma un
+            #     punto de control por par (el cabezal), más el último valor.
             control = list(rows[::2])
-            if len(rows) % 2 == 0 and rows[-1] != control[-1]:
+            if rows[-1] != control[-1]:
                 control.append(rows[-1])
             for i in range(len(control) - 1):
-                va, ra, ga, ba = control[i]
-                vb, rb, gb, bb = control[i + 1]
-                if va < vb:
-                    obj.segments.append((va, ra, ga, ba, vb, rb, gb, bb))
-                else:
-                    obj.segments.append((vb, rb, gb, bb, va, ra, ga, ba))
+                add_segment(control[i], control[i + 1])
         else:
-            # Paleta discreta: cada par de filas es un segmento plano de un solo color.
+            # (a) discreta: cada par de filas es un bloque plano de un solo color.
             for i in range(0, len(rows) - 1, 2):
-                va, ra, ga, ba = rows[i]
-                vb, rb, gb, bb = rows[i + 1]
-                if va < vb:
-                    obj.segments.append((va, ra, ga, ba, vb, rb, gb, bb))
-                else:
-                    obj.segments.append((vb, rb, gb, bb, va, ra, ga, ba))
+                add_segment(rows[i], rows[i + 1])
 
         if obj.segments:
             obj._build_palette_from_segments(has_n=False, has_f=False)

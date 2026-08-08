@@ -1,0 +1,23 @@
+# aod550.cpt
+# Aerosol Optical Depth @ 550 nm (dimensionless)
+# Extraida del tag colormap= de noaa20_viirs_AOD550_20260804_202024_wgs84_geo_750m.tif
+# Rango de despliegue recomendado: --minmax 0.0,1.0
+#   (satura eventos extremos >1; coincide con el producto polar VIIRS AOD550.
+#    El rango valido completo del producto es -0.05 a 5.0, pero 0-1 resalta
+#    la senal tipica de bruma/haze y es el usado por la referencia.)
+# COLOR_MODEL = RGB
+# Format: [Val1] [R1] [G1] [B1]   [Val2] [R2] [G2] [B2]
+
+0.000   0   0 127   0.125   0   0 255
+0.125   0   0 255   0.250   0 127 255
+0.250   0 127 255   0.375   0 255 255
+0.375   0 255 255   0.500 127 255 127
+0.500 127 255 127   0.625 255 255   0
+0.625 255 255   0   0.750 255 127   0
+0.750 255 127   0   0.875 255   0   0
+0.875 255   0   0   1.000 127   0   0
+
+# Special values
+B   0   0 127   # Background (< 0.0)
+F 127   0   0   # Foreground (> 1.0)
+N   0   0   0   # No Data

@@ -175,6 +175,20 @@ COLORMAP_DISCRETO = """\
 2.500000,1,251,0
 """
 
+# Formato del producto VIIRS ASCI AOD550: una línea por punto de control,
+# sin pares ni fronteras repetidas.
+COLORMAP_PUNTOS = """\
+0.000000,0,0,127
+0.125000,0,0,255
+0.250000,0,127,255
+0.375000,0,255,255
+0.500000,127,255,127
+0.625000,255,255,0
+0.750000,255,127,0
+0.875000,255,0,0
+1.000000,127,0,0
+"""
+
 
 class TestFromTiffColormap:
     def test_continuous_palette_length(self):
@@ -208,8 +222,27 @@ class TestFromTiffColormap:
             v1, r1, g1, b1, v2, r2, g2, b2 = seg
             assert (r1, g1, b1) == (r2, g2, b2), f"Segmento {v1}-{v2} no es plano"
 
+    def test_puntos_de_control_rango(self):
+        """Una línea por punto de control: el rango cubre hasta el último valor."""
+        cpt = ColorPaletteTable.from_tiff_colormap(COLORMAP_PUNTOS)
+        assert cpt.min_val == pytest.approx(0.0)
+        assert cpt.max_val == pytest.approx(1.0)
+
+    def test_puntos_de_control_sin_huecos(self):
+        """Los segmentos deben encadenarse sin dejar tramos sin definir."""
+        cpt = ColorPaletteTable.from_tiff_colormap(COLORMAP_PUNTOS)
+        assert len(cpt.segments) == 8
+        for anterior, siguiente in zip(cpt.segments, cpt.segments[1:]):
+            assert anterior[4] == pytest.approx(siguiente[0])
+
+    def test_puntos_de_control_extremos(self):
+        """Los colores de los extremos son los del primer y último punto."""
+        cpt = ColorPaletteTable.from_tiff_colormap(COLORMAP_PUNTOS)
+        assert tuple(cpt.palette[0:3]) == (0, 0, 127)
+        assert tuple(cpt.palette[255 * 3:255 * 3 + 3]) == (127, 0, 0)
+
     def test_palette_values_in_range(self):
-        for colormap in (COLORMAP_CONTINUO, COLORMAP_DISCRETO):
+        for colormap in (COLORMAP_CONTINUO, COLORMAP_DISCRETO, COLORMAP_PUNTOS):
             cpt = ColorPaletteTable.from_tiff_colormap(colormap)
             assert min(cpt.palette) >= 0
             assert max(cpt.palette) <= 255

@@ -1160,6 +1160,77 @@ def calculate_size(value, ref_size, default=0):
         return default
 
 
+def make_south_room(img, metadata, lat_south, compress=False, n_idx=None):
+    """
+    Crea espacio vacío en la parte inferior de la imagen extendiendo los bounds al sur.
+
+    Cuando el borde sur de los datos está al norte de lat_south, libera pad_px filas
+    en la parte inferior de la imagen (para colorbar u otros elementos) sin cambiar
+    el tamaño total. Los metadatos de bounds se actualizan para mantenerse en sincronía
+    con los píxeles, garantizando una georreferencia correcta en MapDrawer.
+
+    Modos:
+      compress=False (default): Recorta pad_px filas del norte y las reemplaza por
+          espacio vacío al sur. El norte visible se desplaza hacia el sur.
+      compress=True: Comprime los datos al alto disponible (H - pad_px) y añade
+          el espacio vacío al sur. El norte se preserva exactamente.
+
+    Solo actúa si bounds están disponibles y el borde sur está al norte de lat_south.
+    """
+    bounds = metadata.get('bounds')
+    if bounds is None:
+        return img, metadata
+
+    left, bottom, right, top = bounds
+    if bottom <= lat_south:
+        return img, metadata
+
+    W, H = img.size
+    dpp = (top - bottom) / H  # grados por píxel
+    pad_px = math.ceil((bottom - lat_south) / dpp)
+
+    if pad_px <= 0 or pad_px >= H:
+        return img, metadata
+
+    debug_msg(f"make_south_room: bottom={bottom:.4f}, lat_south={lat_south}, pad_px={pad_px}, compress={compress}")
+
+    # Valor de relleno para filas vacías
+    if img.mode == 'RGBA':
+        fill = (0, 0, 0, 0)
+    elif img.mode == 'RGB':
+        fill = (0, 0, 0)
+    else:  # L, P
+        fill = n_idx if n_idx is not None else 0
+
+    new_img = Image.new(img.mode, (W, H), fill)
+
+    if compress:
+        resample = Image.Resampling.NEAREST if img.mode == 'P' else Image.Resampling.LANCZOS
+        small = img.resize((W, H - pad_px), resample)
+        new_img.paste(small, (0, 0))
+        new_top = top
+        new_bottom = lat_south
+    else:
+        # Cortar pad_px filas del norte, pegarlas vacías al sur
+        cropped = img.crop((0, pad_px, W, H))
+        new_img.paste(cropped, (0, 0))
+        new_top = top - pad_px * dpp
+        new_bottom = bottom - pad_px * dpp  # ≈ lat_south
+
+    metadata['bounds'] = (left, new_bottom, right, new_top)
+
+    if 'nodata_mask' in metadata:
+        mask = metadata['nodata_mask']
+        new_mask = np.ones((H, W), dtype=bool)
+        if compress:
+            mask_img = Image.fromarray((mask * 255).astype(np.uint8))
+            mask_small = mask_img.resize((W, H - pad_px), Image.Resampling.NEAREST)
+            new_mask[:H - pad_px, :] = np.array(mask_small) > 127
+        else:
+            new_mask[:H - pad_px, :] = mask[pad_px:H, :]
+        metadata['nodata_mask'] = new_mask
+
+    return new_img, metadata
 
 
 # --- Bloque Principal para pruebas ---
@@ -1233,6 +1304,12 @@ def main():
                         help="Factor de escala para redimensionar la imagen (ej. 0.5)")
     parser.add_argument("--outsize",
                         help="Tamaño de salida: '512' o '512x' = ancho, 'x300' = alto, '200x200' = exacto")
+
+    parser.add_argument("--lat-south", type=float, metavar="LAT",
+                        help="Latitud límite sur: crea espacio vacío debajo de esa latitud para la barra de color. "
+                             "Solo actúa si los bounds son geográficos y el borde sur de los datos está al norte de LAT.")
+    parser.add_argument("--compress", action="store_true",
+                        help="Con --lat-south: comprime los datos en lugar de desplazarlos (preserva el norte exacto).")
 
     parser.add_argument("--jpeg", "-j", action="store_true",
                         help="Guardar salida en formato JPEG (por defecto PNG)")
@@ -1334,6 +1411,19 @@ def main():
         debug_msg(
             f"Escalando imagen de {img.size} a {(new_w, new_h)} (Factor: {args.scale})")
         img = img.resize((new_w, new_h), resample=Image.Resampling.LANCZOS)
+
+    # Espacio sur para la colorbar (--lat-south). Se aplica ya escalada la
+    # imagen y antes de cualquier reproyección, para que bounds y píxeles
+    # entren juntos al resto del flujo.
+    if args.lat_south is not None:
+        b = metadata.get('bounds')
+        if b is None:
+            print("Advertencia: --lat-south requiere bounds en los metadatos. Se omite.", file=sys.stderr)
+        elif abs(b[0]) > 360 or abs(b[2]) > 360 or abs(b[1]) > 90 or abs(b[3]) > 90:
+            print("Advertencia: --lat-south requiere bounds geográficos (lat/lon). Se omite.", file=sys.stderr)
+        else:
+            img, metadata = make_south_room(img, metadata, args.lat_south,
+                                            compress=args.compress)
 
     # Reproyección de salida (--o_crs): ocurre ANTES de dibujar overlays
     dst_transform = None

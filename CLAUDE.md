@@ -47,7 +47,7 @@ The system has two CLI entry points and four importable library modules:
 
 ### Entry Points
 - **`geotiff2view.py`** — Reads GeoTIFF → converts to PNG/JPEG with color palettes (CPT). Delegates to `MapDrawer` internally for overlays. Handles single-band + CPT, RGB composites from 3 separate TIFFs, NoData transparency.
-- **`mapdrawer.py`** — Post-processes existing images (PNG, JPEG, or GeoTIFF) with vector overlays, grids, logos, timestamps, colorbars, and GLM lightning data.
+- **`mapdrawer.py`** — Post-processes existing images (PNG, JPEG, or GeoTIFF) with vector overlays, grids, logos, timestamps, colorbars, and GLM lightning data. Also hosts `make_south_room()`, the `--lat-south` helper that frees empty rows at the bottom for the colorbar; `geotiff2view` imports it from here.
 
 ### Library Modules
 - **`metadata.py`** (`Metadata` class) — Dict-like container for CRS, bounds, timestamp, satellite name. Factory methods: `Metadata.from_rasterio(src)`, `Metadata.from_json_file(path)`, `Metadata.from_dict(data)`. Key helper: `get_mapdrawer_bounds()` converts rasterio (left, bottom, right, top) to MapDrawer (ulx, uly, lrx, lry) format.
