@@ -1,0 +1,12 @@
+# cloud_fraction.cpt
+# Total Cloud Fraction (NOAA Enterprise JRR-CloudCoverLayers)
+# UNIT = 1
+# COLOR_MODEL = RGB
+0.0     20  25  40      0.25   70  80 100
+0.25    70  80 100      0.50  140 150 170
+0.50   140 150 170      0.75  200 205 215
+0.75   200 205 215      1.00  255 255 255
+B       20  25  40
+F      255 255 255
+N        0   0   0
+
