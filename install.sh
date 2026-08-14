@@ -118,8 +118,20 @@ echo "  ✓ Comando ${BIN_WRAPPER_G2V} creado"
 # Verificación
 echo ""
 echo -e "${YELLOW}Verificando instalación...${NC}"
-if command -v mapdrawer &> /dev/null && mapdrawer --help > /dev/null 2>&1 && \
-   command -v geotiff2view &> /dev/null && geotiff2view --help > /dev/null 2>&1; then
+VERIFY_OK=1
+for cmd in "${BIN_WRAPPER_MD}" "${BIN_WRAPPER_G2V}"; do
+    if ! salida=$("${cmd}" --help 2>&1); then
+        echo -e "${RED}  ✗ Falló '${cmd} --help':${NC}"
+        echo "${salida}" | tail -20
+        VERIFY_OK=0
+    fi
+done
+
+if [ "${VERIFY_OK}" -eq 1 ]; then
+    if ! command -v mapdrawer > /dev/null 2>&1; then
+        echo -e "${YELLOW}  Nota: $(dirname "${BIN_WRAPPER_MD}") no está en el PATH de este shell${NC}"
+        echo "  (común bajo sudo por 'secure_path'); los comandos sí funcionan como usuario normal."
+    fi
     echo -e "${GREEN}✓ Instalación completada exitosamente!${NC}"
     echo ""
     echo "Puede usar los comandos desde cualquier ubicación:"
