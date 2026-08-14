@@ -55,8 +55,21 @@ def debug_msg(msg):
     if VERBOSE:
         print(f"[DEBUG] {msg}", file=sys.stderr)
 
-def normalize_band(band, nodata_val=None):
-    """Normaliza una banda numpy a 0-255 (uint8) y devuelve máscara de nodata."""
+def normalize_band(band, nodata_val=None, percentiles=None):
+    """Normaliza una banda numpy a 0-255 (uint8) y devuelve máscara de nodata.
+
+    Por omisión estira linealmente entre el mínimo y el máximo del dato válido.
+    Eso solo es correcto cuando la distribución llena su propio rango; con una
+    cola larga, un puñado de píxeles extremos se lleva toda la escala y el resto
+    de la imagen queda en negro.
+
+    Con percentiles=(lo, hi) el estirado se hace entre esos dos percentiles y lo
+    que queda fuera se satura. Es lo que necesitan los productos DNB de
+    Polar2Grid: en la pasada nocturna del 2026-08-14, dynamic_dnb tenía mediana
+    0.30 y máximo 66.9, y hncc_dnb mediana 0.023 y máximo 261, así que con
+    min-max sus medianas caían en los niveles 1 y 0.1 de 255 — imágenes negras.
+    Con recorte al 1-99 % los dos revelan luces de ciudad y estructura de nubes.
+    """
     data = band.astype(float)
     debug_msg(f"Normalizando float mínimo {np.nanmin(data)} y máximo {np.nanmax(data)}.")
     mask = np.zeros(data.shape, dtype=bool)
@@ -78,22 +91,28 @@ def normalize_band(band, nodata_val=None):
     if valid_data.size == 0:
         return np.zeros(data.shape, dtype=np.uint8), mask
         
-    min_val = np.min(valid_data)
-    max_val = np.max(valid_data)
-    
-    debug_msg(f"Normalizando banda: min={min_val}, max={max_val}")
-    
+    if percentiles is not None:
+        lo, hi = percentiles
+        min_val, max_val = np.percentile(valid_data, [lo, hi])
+        debug_msg(f"Normalizando banda por percentiles {lo}-{hi}: "
+                  f"min={min_val}, max={max_val} "
+                  f"(el dato va de {np.min(valid_data)} a {np.max(valid_data)})")
+    else:
+        min_val = np.min(valid_data)
+        max_val = np.max(valid_data)
+        debug_msg(f"Normalizando banda: min={min_val}, max={max_val}")
+
     # Rellenar nodata con min_val para que al normalizar sea 0 (Negro)
     data[mask] = min_val
-    
+
     if max_val == min_val:
         return np.zeros(data.shape, dtype=np.uint8), mask
-        
-    # Escalar
-    norm = (data - min_val) / (max_val - min_val)
+
+    # Escalar. El clip solo muerde con percentiles; sin ellos min/max ya acotan.
+    norm = np.clip((data - min_val) / (max_val - min_val), 0.0, 1.0)
     return (norm * 255).astype(np.uint8), mask
 
-def load_geotiff(filepath, n_idx=None, f_idx=None, offset=0, scale_factor=1.0, raw_values=False, transparent_nodata=False, is_normalized=False, autoscale_vals=None):
+def load_geotiff(filepath, n_idx=None, f_idx=None, offset=0, scale_factor=1.0, raw_values=False, transparent_nodata=False, is_normalized=False, autoscale_vals=None, percentiles=None):
     """Lee un GeoTIFF y devuelve una imagen PIL."""
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"Archivo no encontrado: {filepath}")
@@ -213,9 +232,9 @@ def load_geotiff(filepath, n_idx=None, f_idx=None, offset=0, scale_factor=1.0, r
             
             # Normalizar si es float/int16
             if src.count >= 3:
-                r, m_r = normalize_band(data[0], src.nodata)
-                g, m_g = normalize_band(data[1], src.nodata)
-                b, m_b = normalize_band(data[2], src.nodata)
+                r, m_r = normalize_band(data[0], src.nodata, percentiles)
+                g, m_g = normalize_band(data[1], src.nodata, percentiles)
+                b, m_b = normalize_band(data[2], src.nodata, percentiles)
                 img = Image.fromarray(np.dstack((r, g, b)), 'RGB')
                 
                 mask = m_r | m_g | m_b
@@ -228,7 +247,7 @@ def load_geotiff(filepath, n_idx=None, f_idx=None, offset=0, scale_factor=1.0, r
                     img.putalpha(Image.fromarray(alpha, 'L'))
                 return img, metadata
             else:
-                norm_data, mask = normalize_band(data[0], src.nodata)
+                norm_data, mask = normalize_band(data[0], src.nodata, percentiles)
                 metadata['nodata_mask'] = mask
                 img = Image.fromarray(norm_data, 'L')
                 if transparent_nodata:
@@ -265,7 +284,7 @@ def load_geotiff(filepath, n_idx=None, f_idx=None, offset=0, scale_factor=1.0, r
                 return Image.fromarray(img_data, 'L'), metadata
             else:
                 # Modo visualización: normalizar a 0-255
-                norm_data, _ = normalize_band(arr)
+                norm_data, _ = normalize_band(arr, percentiles=percentiles)
                 metadata['nodata_mask'] = mask
                 return Image.fromarray(norm_data, 'L'), metadata
 
@@ -315,6 +334,10 @@ def main():
     parser.add_argument("--save-metadata", help="Guardar metadatos (CRS, bounds, timestamp) en un archivo JSON.")
     parser.add_argument("--verbose", "-v", action="store_true", help="Mostrar mensajes de depuración")
     parser.add_argument("--autoscale", action="store_true", help="Forzar escalado de datos normalizados (0-1) al rango de la paleta.")
+    parser.add_argument("--percentiles", metavar="LO,HI",
+                        help="Sin paleta: estirar a 0-255 entre esos dos percentiles (p. ej. 1,99) "
+                             "en vez de entre el mínimo y el máximo. Para datos con cola larga, "
+                             "donde unos pocos píxeles extremos dejan el resto en negro (DNB).")
     parser.add_argument("--clip", help="Recortar imagen a límites: ULX,ULY,LRX,LRY (separados por coma) o nombre de región")
     parser.add_argument("--lat-south", type=float, metavar="LAT",
                         help="Latitud límite sur: crea espacio vacío debajo de esa latitud para la barra de color. "
@@ -369,6 +392,26 @@ def main():
     is_normalized = False
     autoscale_vals = None
 
+    percentiles = None
+    if args.percentiles:
+        try:
+            lo, hi = [float(x) for x in args.percentiles.split(',')]
+        except ValueError:
+            print(f"Error: --percentiles espera dos números separados por coma, "
+                  f"no '{args.percentiles}'", file=sys.stderr)
+            sys.exit(1)
+        if not (0 <= lo < hi <= 100):
+            print(f"Error: --percentiles necesita 0 <= LO < HI <= 100, "
+                  f"se recibió {lo},{hi}", file=sys.stderr)
+            sys.exit(1)
+        percentiles = (lo, hi)
+        if args.cpt:
+            # Con paleta el rango lo fija el CPT, no los datos: estirar por
+            # percentiles rompería la correspondencia con la barra de color.
+            print("Advertencia: --percentiles se ignora cuando hay paleta (-p); "
+                  "el rango lo define el CPT.", file=sys.stderr)
+            percentiles = None
+
     if args.cpt:
         cpt_path = args.cpt
         # Si no existe localmente, buscar en directorio global
@@ -409,7 +452,7 @@ def main():
         for idx, fpath in enumerate(resolved_files):
             print(f"  Cargando canal {['R','G','B'][idx]}: {fpath}")
             # Cargar normalizado (0-255) ignorando paleta
-            ch_img, ch_meta = load_geotiff(fpath, offset=offset, scale_factor=scale_factor, raw_values=False, transparent_nodata=False, is_normalized=is_normalized)
+            ch_img, ch_meta = load_geotiff(fpath, offset=offset, scale_factor=scale_factor, raw_values=False, transparent_nodata=False, is_normalized=is_normalized, percentiles=percentiles)
             
             if ch_img.mode != 'L':
                 ch_img = ch_img.convert('L')
@@ -433,7 +476,7 @@ def main():
             img.putalpha(Image.fromarray(alpha, 'L'))
     else:
         print(f"Procesando {args.input}...")
-        img, metadata = load_geotiff(args.input, n_idx=n_idx, f_idx=f_idx, offset=offset, scale_factor=scale_factor, raw_values=(palette is not None), transparent_nodata=args.alpha, is_normalized=is_normalized, autoscale_vals=autoscale_vals)
+        img, metadata = load_geotiff(args.input, n_idx=n_idx, f_idx=f_idx, offset=offset, scale_factor=scale_factor, raw_values=(palette is not None), transparent_nodata=args.alpha, is_normalized=is_normalized, autoscale_vals=autoscale_vals, percentiles=percentiles)
 
     # Desplazar/comprimir imagen para crear espacio sur para colorbar
     if args.lat_south is not None and cpt_obj is not None:
