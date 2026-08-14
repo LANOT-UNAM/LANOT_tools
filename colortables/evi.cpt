@@ -2,7 +2,14 @@
 # Enhanced Vegetation Index (VIIRS LSR v2.0)
 # UNIT = 1
 # COLOR_MODEL = RGB
--1.0      0   20   80     0.0      0   50  130
+#
+# Rango 0.0-1.0, a diferencia de ndvi.cpt, que va de -1 a 1. El EVI esta
+# disenado para no saturarse en vegetacion densa, asi que sus valores viven
+# casi todos entre 0 y 0.6: con la rampa de NDVI las dos vistas salian casi
+# identicas (RMSE 4.7% sobre la pasada del 2026-08-11) y media rampa se iba en
+# negativos que sobre tierra no ocurren. Tampoco hace falta el tramo azul de
+# agua: LSR solo entrega superficie terrestre. EVI < 0 satura en el beige del
+# 0.0, que es lo correcto -- suelo desnudo.
  0.0    245  235  190     0.15   205  215  155
  0.15   205  215  155     0.30   150  190  115
  0.30   150  190  115     0.50    95  165   75

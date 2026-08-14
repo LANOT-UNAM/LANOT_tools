@@ -314,22 +314,38 @@ class Metadata:
 
         # --- product + units ---
         # Each entry: (token, label, units_or_None)
+        # Order matters: the first token found as a substring wins, so the
+        # specific ones go before the generic (the four DNB algorithms before
+        # plain 'dnb', or all four would come out labelled just "DNB").
+        # The _surf variants of the RGB (surface reflectance, VIIRS LSR) need no
+        # entry of their own: true_color_surf already matches true_color and
+        # false_color_surf matches false_color.
         if 'product' not in self:
             product_map = [
-                ('true_color',       'True Color',        None),
-                ('sst',              'SST',               'K'),
-                ('cldtoptemp',       'Cloud Top Temp',    'K'),
-                ('cld_temp_acha',    'Cloud Top Temp',    'K'),
-                ('cldtophght',       'Cloud Top Height',  'm'),
-                ('cld_height_acha',  'Cloud Top Height',  'm'),
-                ('cloudphase',       'Cloud Phase',       None),
-                ('cloud_phase',      'Cloud Phase',       None),
-                ('cloud_type',       'Cloud Type',        None),
-                ('cld_emiss_acha',   'Cloud Emissivity',  None),
-                ('flood',            'Flood',             None),
-                ('water',            'Flood',             None),
-                ('fire',             'Fire',              None),
-                ('dnb',              'DNB',               None),
+                ('true_color',       'True Color',           None),
+                ('false_color',      'Day Land Cloud Fire',  None),
+                ('sst',              'SST',                  'K'),
+                ('cldtoptemp',       'Cloud Top Temp',       'K'),
+                ('cld_temp_acha',    'Cloud Top Temp',       'K'),
+                ('cldtophght',       'Cloud Top Height',     'm'),
+                ('cld_height_acha',  'Cloud Top Height',     'm'),
+                ('cldbasehght',      'Cloud Base Height',    'm'),
+                ('cloudphase',       'Cloud Phase',          None),
+                ('cloud_phase',      'Cloud Phase',          None),
+                ('cloud_type',       'Cloud Type',           None),
+                ('cloud_fraction',   'Cloud Fraction',       None),
+                ('cld_emiss_acha',   'Cloud Emissivity',     None),
+                ('aod550',           'AOD 550 nm',           None),
+                ('ndvi',             'NDVI',                 None),
+                ('evi',              'EVI',                  None),
+                ('flood',            'Flood',                None),
+                ('water',            'Flood',                None),
+                ('fire',             'Fire',                 None),
+                ('adaptive_dnb',     'DNB Adaptive',         None),
+                ('dynamic_dnb',      'DNB Dynamic',          None),
+                ('histogram_dnb',    'DNB Histogram',        None),
+                ('hncc_dnb',         'DNB HNCC',             None),
+                ('dnb',              'DNB',                  None),
             ]
             # Priority: basename first, then full path (directory) as fallback
             for token, label, units in product_map:
