@@ -168,6 +168,21 @@ El GeoTIFF de ceniza debe ser de **1 banda uint8 con colormap embebido** (format
 | `--save-metadata FILE` | Exporta CRS, bounds y timestamp a JSON |
 | `--verbose` | Mensajes de depuración |
 
+#### Códigos de salida de geotiff2view
+
+| Código | Significado |
+|---|---|
+| 0 | Imagen generada |
+| 3 | El GeoTIFF **no tenía un solo píxel válido**: no se escribió ni la imagen ni el JSON de `--save-metadata` |
+| 1 | Error |
+| 2 | Error de uso (argparse) |
+
+El 3 **no es un fallo**: hay productos que salen legítimamente vacíos en una
+pasada —el EVI de CSPP LSR, por ejemplo—, y una imagen en negro es peor que
+ninguna, porque se publica y se cuenta como buena. Quien invoque en lote debe
+distinguirlo de un error de verdad; el aviso va a stderr sin necesidad de
+`--verbose`.
+
 ### Como biblioteca Python
 
 ```python

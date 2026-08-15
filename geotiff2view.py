@@ -51,6 +51,13 @@ VERBOSE = False
 # Directorio global de paletas (instalación estándar)
 GLOBAL_CPT_DIR = "/usr/local/share/lanot/colortables"
 
+# Código de salida para "el GeoTIFF no tiene un solo píxel válido, no escribí
+# nada". No es un fallo: hay productos que legítimamente salen vacíos en una
+# pasada, y una imagen en negro es peor que ninguna porque se publica y se cuenta
+# como buena. Se reserva el 3 porque argparse ya usa el 2 para errores de uso y
+# el 1 queda para los fallos de verdad.
+SIN_DATOS_VALIDOS = 3
+
 def debug_msg(msg):
     if VERBOSE:
         print(f"[DEBUG] {msg}", file=sys.stderr)
@@ -71,7 +78,11 @@ def normalize_band(band, nodata_val=None, percentiles=None):
     Con recorte al 1-99 % los dos revelan luces de ciudad y estructura de nubes.
     """
     data = band.astype(float)
-    debug_msg(f"Normalizando float mínimo {np.nanmin(data)} y máximo {np.nanmax(data)}.")
+    # Dentro del guardia a propósito: la f-string se evalúa antes de la llamada,
+    # así que sin él np.nanmin/np.nanmax recorren el arreglo completo aunque no
+    # se vaya a imprimir. Ver la misma nota en load_geotiff().
+    if VERBOSE:
+        debug_msg(f"Normalizando float mínimo {np.nanmin(data)} y máximo {np.nanmax(data)}.")
     mask = np.zeros(data.shape, dtype=bool)
     
     # Detectar NaNs
@@ -218,9 +229,19 @@ def load_geotiff(filepath, n_idx=None, f_idx=None, offset=0, scale_factor=1.0, r
                 
                 if n_idx is not None and mask is not None:
                     img_data[mask] = n_idx
-           
-                debug_msg(f"Mínimo {np.nanmin(data)} y máximo {np.nanmax(data)} de la banda (crudo).")
-                
+
+                # Sin un solo píxel válido no hay imagen que hacer: se marca aquí
+                # y main() decide. Antes se pintaba todo del color de nodata y
+                # salía un JPG en negro que la cadena contaba como producto.
+                if mask is not None and mask.all():
+                    metadata['sin_datos_validos'] = True
+
+                # El cálculo va dentro del guardia: la f-string se arma ANTES de
+                # llamar a debug_msg(), así que sin él se recorre el arreglo
+                # completo aunque no se vaya a imprimir nada.
+                if VERBOSE:
+                    debug_msg(f"Mínimo {np.nanmin(data)} y máximo {np.nanmax(data)} de la banda (crudo).")
+
                 return Image.fromarray(img_data, 'L'), metadata
             
             # Si ya es uint8, usar directamente
@@ -239,7 +260,9 @@ def load_geotiff(filepath, n_idx=None, f_idx=None, offset=0, scale_factor=1.0, r
                 
                 mask = m_r | m_g | m_b
                 metadata['nodata_mask'] = mask
-                
+                if mask.all():
+                    metadata['sin_datos_validos'] = True
+
                 if transparent_nodata:
                     # Combinar máscaras: si cualquiera es nodata, es transparente? 
                     # O solo si todos? Usualmente si todos. Asumamos unión por seguridad visual.
@@ -249,6 +272,8 @@ def load_geotiff(filepath, n_idx=None, f_idx=None, offset=0, scale_factor=1.0, r
             else:
                 norm_data, mask = normalize_band(data[0], src.nodata, percentiles)
                 metadata['nodata_mask'] = mask
+                if mask.all():
+                    metadata['sin_datos_validos'] = True
                 img = Image.fromarray(norm_data, 'L')
                 if transparent_nodata:
                     alpha = (~mask * 255).astype(np.uint8)
@@ -314,7 +339,13 @@ def calculate_size(value, ref_size, default=0):
 
 def main():
     global VERBOSE
-    parser = argparse.ArgumentParser(description="Convierte GeoTIFF a imagen visible.")
+    parser = argparse.ArgumentParser(
+        description="Convierte GeoTIFF a imagen visible.",
+        epilog="Códigos de salida: 0 imagen generada; "
+               f"{SIN_DATOS_VALIDOS} el GeoTIFF no tenía un solo píxel válido y "
+               "no se escribió nada (no es un fallo: hay productos que salen "
+               "vacíos en una pasada); 1 error; 2 error de uso.",
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("input", help="Archivo GeoTIFF de entrada")
     parser.add_argument("--output", "-o", help="Archivo de salida")
     parser.add_argument("--cpt", "-p", help="Archivo de paleta de colores (CPT)")
@@ -477,6 +508,16 @@ def main():
     else:
         print(f"Procesando {args.input}...")
         img, metadata = load_geotiff(args.input, n_idx=n_idx, f_idx=f_idx, offset=offset, scale_factor=scale_factor, raw_values=(palette is not None), transparent_nodata=args.alpha, is_normalized=is_normalized, autoscale_vals=autoscale_vals, percentiles=percentiles)
+
+    # Si no hubo un solo píxel válido, no se escribe nada: ni la imagen ni el
+    # JSON de metadatos. Se sale con SIN_DATOS_VALIDOS para que quien invoque
+    # pueda distinguirlo de un fallo, y el mensaje va a stderr sin depender de
+    # -v porque es la única señal de que el producto se quedó sin vista.
+    # (En la composición RGB de tres archivos la marca es la del primer canal.)
+    if metadata is not None and metadata.get('sin_datos_validos'):
+        print(f"Sin datos válidos en {args.input}: no se genera imagen.",
+              file=sys.stderr)
+        sys.exit(SIN_DATOS_VALIDOS)
 
     # Desplazar/comprimir imagen para crear espacio sur para colorbar
     if args.lat_south is not None and cpt_obj is not None:
