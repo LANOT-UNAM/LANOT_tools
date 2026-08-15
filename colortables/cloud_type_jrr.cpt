@@ -1,49 +1,57 @@
 # cloud_type_jrr.cpt
 # Tipo de nube del producto JRR-CloudPhase de CSPP ATMOS (variable CloudType).
 #
-# Son las NUEVE primeras clases de cloud_type.cpt, con sus mismos colores. El
-# producto JRR declara `valid_range = 0b, 8b`, o sea 0-8, mientras que la salida
-# de CLAVR-x llega a 12: Overshooting, Unknown, Dust y Smoke son extras de
-# CLAVR-x que en JRR no ocurren. Dibujarlos en la barra seria anunciar categorias
-# imposibles, de ahi este archivo aparte.
+# Las etiquetas son las del algoritmo empresarial de nubes de NOAA, Tabla 30
+# ("A description of the cloud type output") del ATBD:
+#
+#   Enterprise Algorithm Theoretical Basis Document For Cloud Type and Phase, v3.0
+#   https://www.star.nesdis.noaa.gov/JPSS/documents/ATBD/ATBD_EPS_Cloud_CldType_v3.0.pdf
+#
+#   0 Clear                     confidently clear segun la mascara de nubes
+#   1 Spare                     reservado; el algoritmo nunca lo emite
+#   2 Liquid Water              nube de agua liquida, cima con T > 273 K
+#   3 Supercooled Liquid Water  nube de agua liquida, cima con T < 273 K
+#   4 Mixed Phase               agua liquida y hielo cerca de la cima
+#   5 Optically Thick Ice       hielo de alta emisividad, prof. optica IR > 2.0
+#   6 Optically Thin Ice        hielo con prof. optica IR de ~2.0 o menos (cirros)
+#   7 Multilayered Ice          hielo semitransparente sobre otra capa opaca
+#   8 Cloud type could not be determined
+#
+# Son nueve y cuadran con el `valid_range = 0b, 8b` que declara el NetCDF. El
+# archivo NO trae `flag_meanings`, solo `long_name`, `units` y `valid_range`, de
+# ahi que haya que citar el ATBD.
+#
+# NO es la lista de CLAVR-x. Son dos algoritmos distintos: CLAVR-x emite trece
+# clases (ver cloud_type.cpt) y JRR nueve. La version anterior de este archivo
+# suponia que JRR eran "las nueve primeras de CLAVR-x" y salio mal; corregirlo a
+# "las nueve primeras sin Prob. clear" habria salido mal tambien. Las diferencias
+# con CLAVR-x son tres:
+#
+#   - JRR no tiene Fog: el 1 es un hueco reservado, no una clase.
+#   - JRR separa el hielo por profundidad optica (grueso/delgado) donde CLAVR-x
+#     dice Opaque Ice / Cirrus. Es la misma idea con otro nombre.
+#   - El 8 de JRR es "no se pudo determinar", no Overshooting; JRR no tiene esa
+#     clase, ni Unknown, ni Dust, ni Smoke.
+#
+# Los colores se eligieron para que coincidan con los de cloud_type.cpt en las
+# clases equivalentes, de modo que la vista nueva y la de CLAVR-x de la misma
+# pasada se puedan comparar de un vistazo: agua azul, sobreenfriada cian, mixta
+# rosa, hielo grueso rojo, hielo delgado amarillo, multicapa naranja.
 #
 # cloud_type.cpt se deja intacto a proposito: lo usa la cadena vieja, que sigue
 # corriendo con el lector clavrx y sus trece clases.
 #
-# ###########################################################################
-# ESTAS ETIQUETAS ESTAN MAL. NO USAR ESTE ARCHIVO HASTA CORREGIRLAS.
-# ###########################################################################
-#
-# Se escribieron suponiendo que la enumeracion de JRR eran las nueve primeras
-# clases de CLAVR-x. La comparacion de las dos vistas de la MISMA pasada
-# (j01_d20260813_b45264, 2026-08-15) lo desmiente: donde CLAVR-x pinta azul
-# (Water, 3) esta pinta verde (Fog, 2), y donde CLAVR-x pinta amarillo
-# (Cirrus, 7) esta pinta rojo (Opaque Ice, 6). Las dos son un corrimiento de -1.
-#
-# La hipotesis nueva —tampoco confirmada— es que JRR sea la lista de CLAVR-x SIN
-# "Prob. clear":
-#
-#   0 Clear  1 Fog  2 Water  3 Super cool  4 Mixed
-#   5 Opaque Ice  6 Cirrus  7 Overlapping  8 Overshooting
-#
-# Son nueve y cuadran con valid_range 0-8. El NetCDF NO trae flag_meanings, solo
-# long_name ("Cloud Type"), units y valid_range, asi que hay que buscar la
-# enumeracion autoritativa en la documentacion de CSPP ATMOS o en el ATBD del
-# algoritmo empresarial de nubes de NOAA. Y en cualquier caso, la prueba final es
-# volver a comparar las dos vistas de la misma pasada: deben coincidir clase por
-# clase, no solo parecerse.
-#
 # COLOR_MODEL = RGB
 # Valor  R   G   B    ; Etiqueta
-0   192 192 192    ; Clear
-1   128 128 128    ; Prob. clear
-2     0 128   0    ; Fog
-3     0   0 255    ; Water
-4     0 255 255    ; Super cool w
-5   252 192 203    ; Mixed
-6   255   0   0    ; Opaque Ice
-7   255 255   0    ; Cirrus
-8   255 165   0    ; Overlapping
+0   192 192 192    ; Despejado
+1    64  64  64    ; Sin uso
+2     0   0 255    ; Agua
+3     0 255 255    ; Sobreenfr.
+4   252 192 203    ; Mixta
+5   255   0   0    ; Hielo grueso
+6   255 255   0    ; Hielo delg.
+7   255 165   0    ; Multicapa
+8   255 255 255    ; Indeterm.
 # Background, Foreground, No Data
 B   0   0   0
 F 255 255 255
