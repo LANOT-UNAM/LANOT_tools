@@ -332,6 +332,7 @@ class Metadata:
                 ('cldbasehght',      'Cloud Base Height',    'm'),
                 ('cloudphase',       'Cloud Phase',          None),
                 ('cloud_phase',      'Cloud Phase',          None),
+                ('cloudtype',        'Cloud Type',           None),
                 ('cloud_type',       'Cloud Type',           None),
                 ('cloud_fraction',   'Cloud Fraction',       None),
                 ('cld_emiss_acha',   'Cloud Emissivity',     None),
