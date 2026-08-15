@@ -10,13 +10,28 @@
 # cloud_type.cpt se deja intacto a proposito: lo usa la cadena vieja, que sigue
 # corriendo con el lector clavrx y sus trece clases.
 #
-# OJO CON LAS ETIQUETAS: el NetCDF de JRR NO trae flag_meanings, solo long_name
-# ("Cloud Type"), units y valid_range. Los nombres de aqui son los del algoritmo
-# empresarial de NOAA, que es el mismo de CLAVR-x, y encajan porque el rango del
-# producto termina justo donde empiezan los extras de CLAVR-x. Es consistente con
-# toda la evidencia disponible, pero NO esta leido del archivo: conviene
-# confirmarlo contra la documentacion de CSPP ATMOS, o comparando esta vista con
-# la de CLAVR-x de la misma pasada, donde las nueve deben coincidir espacialmente.
+# ###########################################################################
+# ESTAS ETIQUETAS ESTAN MAL. NO USAR ESTE ARCHIVO HASTA CORREGIRLAS.
+# ###########################################################################
+#
+# Se escribieron suponiendo que la enumeracion de JRR eran las nueve primeras
+# clases de CLAVR-x. La comparacion de las dos vistas de la MISMA pasada
+# (j01_d20260813_b45264, 2026-08-15) lo desmiente: donde CLAVR-x pinta azul
+# (Water, 3) esta pinta verde (Fog, 2), y donde CLAVR-x pinta amarillo
+# (Cirrus, 7) esta pinta rojo (Opaque Ice, 6). Las dos son un corrimiento de -1.
+#
+# La hipotesis nueva —tampoco confirmada— es que JRR sea la lista de CLAVR-x SIN
+# "Prob. clear":
+#
+#   0 Clear  1 Fog  2 Water  3 Super cool  4 Mixed
+#   5 Opaque Ice  6 Cirrus  7 Overlapping  8 Overshooting
+#
+# Son nueve y cuadran con valid_range 0-8. El NetCDF NO trae flag_meanings, solo
+# long_name ("Cloud Type"), units y valid_range, asi que hay que buscar la
+# enumeracion autoritativa en la documentacion de CSPP ATMOS o en el ATBD del
+# algoritmo empresarial de nubes de NOAA. Y en cualquier caso, la prueba final es
+# volver a comparar las dos vistas de la misma pasada: deben coincidir clase por
+# clase, no solo parecerse.
 #
 # COLOR_MODEL = RGB
 # Valor  R   G   B    ; Etiqueta
