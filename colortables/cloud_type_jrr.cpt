@@ -38,6 +38,13 @@
 # pasada se puedan comparar de un vistazo: agua azul, sobreenfriada cian, mixta
 # rosa, hielo grueso rojo, hielo delgado amarillo, multicapa naranja.
 #
+# Comparadas las dos vistas de j01_d20260813_b45264 (2026-08-15): el mapeo es
+# consistente y muchos-a-uno, que es lo que se esperaba de una lista de nueve
+# clases frente a una de trece. El verde (Fog) de CLAVR-x sale azul aqui, porque
+# JRR no tiene esa clase y la niebla es agua liquida; Opaque Ice y Overshooting
+# caen los dos en hielo grueso; los dos grises de CLAVR-x, en Despejado. Y el
+# valor 1 no aparece en la escena, tal como dice el ATBD.
+#
 # cloud_type.cpt se deja intacto a proposito: lo usa la cadena vieja, que sigue
 # corriendo con el lector clavrx y sus trece clases.
 #
