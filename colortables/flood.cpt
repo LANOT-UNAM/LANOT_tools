@@ -1,0 +1,64 @@
+# flood.cpt
+# CSPP VIIRS Flood v2.0 — variable WaterDetection.
+#
+# Colores tomados uno a uno de la tabla de 256 entradas que cspp_viirs_flood2tif.sh
+# incrusta en el GeoTIFF (gdalinfo del 2026-08-14, pasada j01_d20260813_b45264), y
+# etiquetas del atributo WaterDetection:TypeDescription del propio NetCDF:
+#
+#   1: no_valid_data                    15: Floodwater without fraction retrieval
+#   16: Bareland                        17: Vegetation
+#   20: Snow_ice                        27: River/lake ice
+#   30: Cloud                           38: Supra-snow/ice water or mixed ice&water
+#   50: Shadow                          99: NormalWater
+#   100-200: Water Fractions
+#
+# OJO — LA PRIMERA COLUMNA NO ES EL VALOR DEL DATO, ES EL NUMERO DE RECUADRO.
+# Este CPT sirve para DIBUJAR LA LEYENDA, no para recolorear: la imagen ya viene
+# con su paleta incrustada y mapdrawer solo le agrega la barra. Hay dos razones
+# para renumerar, las dos en colorpalettetable.py:
+#
+#   - _draw_colorbar() pinta TODOS los indices entre el minimo y el maximo, y la
+#     rama discreta de load() deja en negro los que el archivo no menciona. Con
+#     los valores reales (1, 15, 16, 20, 27, 30, 38, 50, 99, 100...200) la barra
+#     saldria casi toda negra, con astillas de color.
+#   - _draw_label_row() reparte las etiquetas en (max - min + 1) ranuras, o sea
+#     191 para 18 etiquetas.
+#
+# Es el mismo recurso de glm_fed.cpt: indexar por numero de intervalo y dejar el
+# significado en la etiqueta. NO USAR ESTE ARCHIVO CON geotiff2view -p sobre datos
+# crudos de WaterDetection: recolorearia con los indices equivocados.
+#
+# Los valores del dato entre clases (22-28, 32-39, 40-50, 52-99) son relleno
+# interpolado de la tabla original y no ocurren nunca: WaterDetection solo toma
+# los valores de la lista de arriba y el tramo 100-200.
+#
+# Bareland (16) y Vegetation (17) comparten color en la tabla original, asi que
+# van en un solo recuadro: dos recuadros identicos harian creer que se distinguen.
+#
+# Las nueve fracciones son los bins que define la tabla original, con el color de
+# su punto medio. El primero abarca 0-20 % porque de 100 a 120 usa un solo color.
+#
+# COLOR_MODEL = RGB
+#
+# Recuadro  R    G    B   ; Etiqueta
+0     0   0   0   ; Sin datos
+1     0   0 100   ; Inund. s/f
+2   196 162 114   ; Suelo/veg.
+3   255 255 255   ; Nieve/hielo
+4     0 255 255   ; Hielo lago
+5   200 200 200   ; Nube
+6   180   0 230   ; Agua/hielo
+7   100 100 100   ; Sombra
+8     0   0 255   ; Agua norm.
+9    50 255 100   ; 0-20%
+10    0 255   0   ; 21-30%
+11  200 255   0   ; 31-40%
+12  255 255 100   ; 41-50%
+13  255 255   0   ; 51-60%
+14  255 200   0   ; 61-70%
+15  255 150  50   ; 71-80%
+16  255 100   0   ; 81-90%
+17  255   0   0   ; 91-100%
+B   0   0   0
+F 255 255 255
+N   0   0   0
