@@ -1,0 +1,35 @@
+# cloud_type_jrr.cpt
+# Tipo de nube del producto JRR-CloudPhase de CSPP ATMOS (variable CloudType).
+#
+# Son las NUEVE primeras clases de cloud_type.cpt, con sus mismos colores. El
+# producto JRR declara `valid_range = 0b, 8b`, o sea 0-8, mientras que la salida
+# de CLAVR-x llega a 12: Overshooting, Unknown, Dust y Smoke son extras de
+# CLAVR-x que en JRR no ocurren. Dibujarlos en la barra seria anunciar categorias
+# imposibles, de ahi este archivo aparte.
+#
+# cloud_type.cpt se deja intacto a proposito: lo usa la cadena vieja, que sigue
+# corriendo con el lector clavrx y sus trece clases.
+#
+# OJO CON LAS ETIQUETAS: el NetCDF de JRR NO trae flag_meanings, solo long_name
+# ("Cloud Type"), units y valid_range. Los nombres de aqui son los del algoritmo
+# empresarial de NOAA, que es el mismo de CLAVR-x, y encajan porque el rango del
+# producto termina justo donde empiezan los extras de CLAVR-x. Es consistente con
+# toda la evidencia disponible, pero NO esta leido del archivo: conviene
+# confirmarlo contra la documentacion de CSPP ATMOS, o comparando esta vista con
+# la de CLAVR-x de la misma pasada, donde las nueve deben coincidir espacialmente.
+#
+# COLOR_MODEL = RGB
+# Valor  R   G   B    ; Etiqueta
+0   192 192 192    ; Clear
+1   128 128 128    ; Prob. clear
+2     0 128   0    ; Fog
+3     0   0 255    ; Water
+4     0 255 255    ; Super cool w
+5   252 192 203    ; Mixed
+6   255   0   0    ; Opaque Ice
+7   255 255   0    ; Cirrus
+8   255 165   0    ; Overlapping
+# Background, Foreground, No Data
+B   0   0   0
+F 255 255 255
+N 255   0   0
