@@ -1,0 +1,22 @@
+# nucaps_skin_temp.cpt
+# NUCAPS Skin Temperature
+# Perfil de temperatura NUCAPS (CSPP HEAP), sondeos CrIS+ATMS.
+# Los colores son los de sst.cpt, para que las vistas de temperatura de LANOT
+# Rango mas ancho que el de sst.cpt (268-310): esto incluye tierra, que de dia
+# pasa de 310 K en el norte arido.
+# UNIT = K
+# COLOR_MODEL = RGB
+# Value R G B   Value R G B
+265   222 108 253    270   134   0 239
+270   134   0 239    275    89  72 234
+275    89  72 234    280    76 209 252
+280    76 209 252    285    25 252 154
+285    25 252 154    290    11 208  14
+290    11 208  14    295   124 251   0
+295   124 251   0    300   242 244   0
+300   242 244   0    305   252 126   0
+305   252 126   0    310   218  37   9
+310   218  37   9    315   253 183 130
+B     0   0   0
+F   255 255 255
+N     0   0   0

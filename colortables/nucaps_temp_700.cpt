@@ -1,0 +1,23 @@
+# nucaps_temp_700.cpt
+# NUCAPS Temperature @ 707 mb (700 hPa)
+# Perfil de temperatura NUCAPS (CSPP HEAP), sondeos CrIS+ATMS.
+# Los colores son los de sst.cpt, para que las vistas de temperatura de LANOT
+# se lean igual; lo que cambia entre niveles es el rango, que es lo unico que
+# no se puede compartir: 500 hPa vive 30 K por debajo de 850.
+# Rango fijo y no percentiles: asi dos pasadas del mismo nivel se comparan.
+# UNIT = K
+# COLOR_MODEL = RGB
+# Value R G B   Value R G B
+260   222 108 253    263   134   0 239
+263   134   0 239    266    89  72 234
+266    89  72 234    269    76 209 252
+269    76 209 252    272    25 252 154
+272    25 252 154    275    11 208  14
+275    11 208  14    278   124 251   0
+278   124 251   0    281   242 244   0
+281   242 244   0    284   252 126   0
+284   252 126   0    287   218  37   9
+287   218  37   9    290   253 183 130
+B     0   0   0
+F   255 255 255
+N     0   0   0

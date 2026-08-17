@@ -304,6 +304,16 @@ class Metadata:
                 self['sensor'] = 'MHS'
             elif 'amsu' in lower:
                 self['sensor'] = 'AMSU-A'
+            # Sondeos NUCAPS: Polar2Grid bautiza sus salidas con el par de
+            # instrumentos, 'noaa21_atms-cris_Temperature_497mb_...'. Va antes que
+            # los sueltos porque la recuperacion es de los dos juntos y etiquetar
+            # solo uno seria falso.
+            elif 'atms-cris' in lower or 'cris-atms' in lower:
+                self['sensor'] = 'CrIS+ATMS'
+            elif 'cris' in lower:
+                self['sensor'] = 'CrIS'
+            elif 'atms' in lower:
+                self['sensor'] = 'ATMS'
 
         # --- band ---
         if 'band' not in self:
@@ -339,6 +349,16 @@ class Metadata:
                 ('aod550',           'AOD 550 nm',           None),
                 ('ndvi',             'NDVI',                 None),
                 ('evi',              'EVI',                  None),
+                # Sondeos NUCAPS. Los niveles van uno por uno porque la etiqueta
+                # tiene que decir de cual se trata: el nombre del archivo trae el
+                # nivel real del producto (853/707/497 mb) y la etiqueta, el nivel
+                # nominal con el que se habla de el (850/700/500 hPa).
+                ('skin_temperature',  'Skin Temperature',    'K'),
+                ('temperature_853mb', 'Temp 850 hPa',        'K'),
+                ('temperature_707mb', 'Temp 700 hPa',        'K'),
+                ('temperature_497mb', 'Temp 500 hPa',        'K'),
+                ('surface_pressure',  'Surface Pressure',    'mb'),
+                ('topography',        'Topography',          'm'),
                 ('flood',            'Flood',                None),
                 ('water',            'Flood',                None),
                 ('fire',             'Fire',                 None),
@@ -347,6 +367,11 @@ class Metadata:
                 ('histogram_dnb',    'DNB Histogram',        None),
                 ('hncc_dnb',         'DNB HNCC',             None),
                 ('dnb',              'DNB',                  None),
+                # Respaldo para los otros 96 niveles de NUCAPS, que no se rinden
+                # hoy pero que se pueden pedir con -p: mas vale "Temperature" sin
+                # nivel que una vista sin nombre de producto. Va al final para no
+                # ganarle a los de arriba, que si dicen el nivel.
+                ('temperature',      'Temperature',          'K'),
             ]
             # Priority: basename first, then full path (directory) as fallback
             for token, label, units in product_map:

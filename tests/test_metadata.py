@@ -190,6 +190,40 @@ class TestEnrichFromFilename:
         assert m.get('product') == 'Cloud Top Temp'
         assert m.get('units') == 'K'
 
+    # --- Sondeos NUCAPS (CSPP HEAP): los nombres que escribe Polar2Grid con el
+    # lector `nucaps`. La vista salia rotulada solo "NOAA-21 <fecha>", sin
+    # producto NI sensor, porque faltaban las dos entradas.
+
+    def test_nucaps_temperature_level(self):
+        m = Metadata()
+        m.enrich_from_filename(
+            'noaa21_atms-cris_Temperature_497mb_20260630_184728_wgs84_geo_5km.tif')
+        assert m.get('satellite') == 'NOAA-21'
+        assert m.get('sensor') == 'CrIS+ATMS'
+        assert m.get('product') == 'Temp 500 hPa'
+        assert m.get('units') == 'K'
+
+    def test_nucaps_skin_temperature(self):
+        m = Metadata()
+        m.enrich_from_filename(
+            'noaa20_atms-cris_Skin_Temperature_20260630_184728_wgs84_geo_5km.tif')
+        assert m.get('sensor') == 'CrIS+ATMS'
+        assert m.get('product') == 'Skin Temperature'
+
+    def test_nucaps_level_sin_entrada_propia_cae_al_generico(self):
+        """Los 96 niveles que no se rinden hoy salen como 'Temperature' a secas,
+        no sin nombre de producto."""
+        m = Metadata()
+        m.enrich_from_filename(
+            'noaa21_atms-cris_Temperature_110mb_20260630_184728_wgs84_geo_5km.tif')
+        assert m.get('product') == 'Temperature'
+
+    def test_generico_no_le_gana_a_los_de_nube(self):
+        """El respaldo va al final de product_map a proposito."""
+        m = Metadata()
+        m.enrich_from_filename('noaa20_viirs_CldTopTemp_20260508_192713_wgs84_fit.tif')
+        assert m.get('product') == 'Cloud Top Temp'
+
 
 # format_timestamp
 # ---------------------------------------------------------------------------
