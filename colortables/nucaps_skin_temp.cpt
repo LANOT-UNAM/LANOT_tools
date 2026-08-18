@@ -2,21 +2,28 @@
 # NUCAPS Skin Temperature
 # Perfil de temperatura NUCAPS (CSPP HEAP), sondeos CrIS+ATMS.
 # Los colores son los de sst.cpt, para que las vistas de temperatura de LANOT
-# Rango mas ancho que el de sst.cpt (268-310): esto incluye tierra, que de dia
-# pasa de 310 K en el norte arido.
+# se lean igual.
+#
+# El rango NO se deduce de los niveles de presion: la piel no es un campo de
+# atmosfera libre. Tiene ciclo diurno y depende de la superficie, asi que su
+# variacion es mucho mas ancha que la de cualquier nivel. Medido en tahan el
+# 2026-08-17 sobre los granulos de muestra (NOAA-21, 30 jun, 18:47Z, o sea
+# cerca del maximo de calentamiento): p2 279, media 304, p98 315, max 319.
+# Con el techo en 315 el desierto y la ciudad se apelmazaban en un solo color.
+# 325 deja aire arriba para un mediodia de mayo, y 265 cubre la madrugada.
 # UNIT = K
 # COLOR_MODEL = RGB
 # Value R G B   Value R G B
-265   222 108 253    270   134   0 239
-270   134   0 239    275    89  72 234
-275    89  72 234    280    76 209 252
-280    76 209 252    285    25 252 154
-285    25 252 154    290    11 208  14
-290    11 208  14    295   124 251   0
-295   124 251   0    300   242 244   0
-300   242 244   0    305   252 126   0
-305   252 126   0    310   218  37   9
-310   218  37   9    315   253 183 130
+265   222 108 253    271   134   0 239
+271   134   0 239    277    89  72 234
+277    89  72 234    283    76 209 252
+283    76 209 252    289    25 252 154
+289    25 252 154    295    11 208  14
+295    11 208  14    301   124 251   0
+301   124 251   0    307   242 244   0
+307   242 244   0    313   252 126   0
+313   252 126   0    319   218  37   9
+319   218  37   9    325   253 183 130
 B     0   0   0
 F   255 255 255
 N     0   0   0
