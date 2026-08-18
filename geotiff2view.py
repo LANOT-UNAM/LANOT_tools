@@ -360,6 +360,11 @@ def main():
     parser.add_argument("--timestamp-pos", type=int, choices=[0, 1, 2, 3], help="Posición de la fecha (0-3).")
     parser.add_argument("--font-size", help="Tamaño de fuente (píxeles o porcentaje del ancho)")
     parser.add_argument("--font-color", default="yellow", help="Color de la fuente del timestamp")
+    # Misma bandera que mapdrawer, que la tiene desde antes: aquí faltaba el paso
+    # por la CLI, aunque draw_fecha ya sabía dibujar el fondo.
+    parser.add_argument("--font-bg", default=None,
+                        help="Color de fondo semitransparente detrás de la fecha (ej. 'black'). "
+                             "Por defecto no se dibuja fondo.")
     parser.add_argument("--legend-pos", type=int, choices=[0, 1, 2, 3], help="Posición de la leyenda (0-3)")
     parser.add_argument("--jpeg", "-j", action="store_true", help="Guardar salida en formato JPEG (por defecto PNG)")
     parser.add_argument("--save-metadata", help="Guardar metadatos (CRS, bounds, timestamp) en un archivo JSON.")
@@ -704,7 +709,8 @@ def main():
                 if ts_text and ts_pos is not None:
                     default_fsize = max(15, int(img.width * 0.015))
                     fsize = calculate_size(args.font_size, img.width, default_fsize)
-                    mapper.draw_fecha(ts_text, position=ts_pos, fontsize=fsize, color=args.font_color)
+                    mapper.draw_fecha(ts_text, position=ts_pos, fontsize=fsize,
+                                      color=args.font_color, bg_color=args.font_bg)
 
                 # Dibujar Leyenda (MapDrawer)
                 if args.legend_pos is not None and cpt_obj and cpt_obj.labels and palette:
