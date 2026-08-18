@@ -365,6 +365,14 @@ def main():
     parser.add_argument("--font-bg", default=None,
                         help="Color de fondo semitransparente detrás de la fecha (ej. 'black'). "
                              "Por defecto no se dibuja fondo.")
+    # Igual que en mapdrawer: draw_legend acepta text_pos desde antes, pero aquí
+    # no había forma de pedirlo, así que la barra salía siempre con los números
+    # DEBAJO. Es lo que impedía poner la fecha abajo a la izquierda como en las
+    # vistas de GOES, donde 'middle' libera el pie de la imagen.
+    parser.add_argument("--colorbar-text-pos", choices=['below', 'middle', 'above'],
+                        default='below',
+                        help="Dónde van los números de la barra de color: 'below' (por "
+                             "omisión), 'middle' o 'above'.")
     parser.add_argument("--legend-pos", type=int, choices=[0, 1, 2, 3], help="Posición de la leyenda (0-3)")
     parser.add_argument("--jpeg", "-j", action="store_true", help="Guardar salida en formato JPEG (por defecto PNG)")
     parser.add_argument("--save-metadata", help="Guardar metadatos (CRS, bounds, timestamp) en un archivo JSON.")
@@ -608,7 +616,8 @@ def main():
             # Si hay MapDrawer, se dibuja DESPUÉS para no interferir con la georreferencia.
             if not uses_mapdrawer:
                 barsz = img.height // 20
-                cpt_obj.draw_legend(ImageDraw.Draw(img), 0, img.height - 2*barsz, img.width, barsz, font_size=barsz//2)
+                cpt_obj.draw_legend(ImageDraw.Draw(img), 0, img.height - 2*barsz, img.width, barsz,
+                                    font_size=barsz//2, text_pos=args.colorbar_text_pos)
         else:
             print("Advertencia: La imagen no es de un solo canal (L), se ignora la paleta.", file=sys.stderr)
 
@@ -743,7 +752,8 @@ def main():
                 # interferir con la georreferencia de las capas vectoriales.
                 if palette and cpt_obj:
                     barsz = img.height // 20
-                    cpt_obj.draw_legend(ImageDraw.Draw(img), 0, img.height - 2*barsz, img.width, barsz, font_size=barsz//2)
+                    cpt_obj.draw_legend(ImageDraw.Draw(img), 0, img.height - 2*barsz, img.width, barsz,
+                                    font_size=barsz//2, text_pos=args.colorbar_text_pos)
 
             except Exception as e:
                 print(f"Error en MapDrawer: {e}", file=sys.stderr)
