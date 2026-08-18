@@ -1,0 +1,67 @@
+# atmosrainbow.cpt
+# Temperatura de tope de nube — la paleta que GOES ya usa en LANOT.
+#
+# Transcripcion de la tabla `atmosrainbow` de HPSATVIEWS (hpsatviews/src/palette.c:11),
+# la que create_nocturnal_pseudocolor() aplica a la temperatura de brillo de ABI C13.
+# El objetivo es que las vistas de GOES y las polares se lean con un solo codigo de
+# color: a la misma temperatura, el mismo color.
+#
+# No es una rampa sino un codigo de dos regimenes:
+#   - arcoiris  (185–253 K): reservado a los topes frios, donde esta la conveccion.
+#   - gris      (254–320 K): nube baja, de blanco a gris oscuro.
+# No se ordena por intuicion sin conocerlo, pero discrimina ocho veces mejor que
+# cld_temp_acha.cpt en 180–260 K, que es donde estan las tormentas.
+#
+# RANGO 180–320 K. La tabla original va de 170 a 380 K; se recorta al rango que el
+# dato ocupa de verdad (medido: 0,0 % fuera) para no gastar entradas del LUT en
+# temperaturas que CldTopTemp no alcanza. Los colores a cada temperatura son los
+# mismos de la tabla original: el recorte mueve los extremos, no la escala.
+#
+# LA TRANSPARENCIA NO VIAJA. La tabla original lleva alpha, que decae de 1,0 a 0
+# por encima de 259 K; ahi ese gris es un velo sobre la superficie, porque se aplica
+# a temperatura de brillo, que existe en toda la escena. CldTopTemp es un producto
+# recuperado y solo existe donde hay nube (32–43 % de la escena), asi que ese tramo
+# NO es superficie que velar: es nube baja, y va opaca. El cielo despejado no es un
+# valor de la escala, es nodata, y se resuelve con N.
+#
+# N (cielo despejado) es azul en vez del negro que usa GOES: aqui el negro es un
+# valor de la escala —el nucleo de 201,7 K—, y confundir el tope mas frio con la
+# ausencia de nube seria el peor error posible. El azul es el color mas lejano
+# (dE 50) de todos los de la rampa. B lleva el mismo color a proposito, para que
+# geotiff2view -b no pinte el cielo despejado de blanco.
+#
+# UNIT = K
+# COLOR_MODEL = RGB
+# Value R G B   Value R G B     # Label
+
+# Topes por debajo de 185 K: blanco. Se repite en 254–275 K; es inherente al codigo.
+180.00  255 255 255   184.62  255 255 255
+
+# Salto a morado. Los saltos ocupan un paso de la tabla original (0,8 K).
+184.62  255 255 255   185.44  127   0 127
+
+# Conveccion profunda: morado a rosa (185–194 K)
+185.44  127   0 127   193.56  255 127 203
+193.56  255 127 203   194.38  230 230 230
+
+# Gris claro a negro (194–202 K). El negro de 201,7 K es el nucleo mas frio.
+194.38  230 230 230   201.69    0   0   0
+
+# Arcoiris (202–253 K): negro→rojo→amarillo→verde→azul→cian
+201.69    0   0   0   209.81  255   0   0
+209.81  255   0   0   217.94  255 255   0
+217.94  255 255   0   226.06    0 255   0
+226.06    0 255   0   235.81    0   0 115
+235.81    0   0 115   236.62    0   0 115
+236.62    0   0 115   252.88    0 255 255
+252.88    0 255 255   253.69  255 255 255
+
+# Nube baja (254–320 K): blanco a gris oscuro. Opaco, ver la nota de arriba.
+253.69  255 255 255   259.38  255 255 255
+259.38  254 254 254   320.00   64  64  64
+
+# Valores especiales
+B     0   0 224   # < 180 K (inalcanzable: el dato se recorta) / nodata con -b
+F    64  64  64   # > 320 K, continuacion del gris
+N     0   0   0   # No Data / Cielo Despejado
+
