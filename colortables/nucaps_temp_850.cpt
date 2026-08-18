@@ -5,19 +5,25 @@
 # se lean igual; lo que cambia entre niveles es el rango, que es lo unico que
 # no se puede compartir: 500 hPa vive 30 K por debajo de 850.
 # Rango fijo y no percentiles: asi dos pasadas del mismo nivel se comparan.
+#
+# El techo estuvo en 300 hasta el 2026-08-17, cuando la escena de muestra
+# (30 jun, mediodia) llego a 301.6 y clipo. No es que 300 fuera raro: sobre
+# el desierto en mayo este nivel pasa de 305 K, y una ola de calor es cuando
+# alguien mira este producto. El paso sale de 3.5 K, no redondo, porque son
+# once colores; las etiquetas de la barra las alinea el codigo, no los cortes.
 # UNIT = K
 # COLOR_MODEL = RGB
 # Value R G B   Value R G B
-270   222 108 253    273   134   0 239
-273   134   0 239    276    89  72 234
-276    89  72 234    279    76 209 252
-279    76 209 252    282    25 252 154
-282    25 252 154    285    11 208  14
-285    11 208  14    288   124 251   0
-288   124 251   0    291   242 244   0
-291   242 244   0    294   252 126   0
-294   252 126   0    297   218  37   9
-297   218  37   9    300   253 183 130
+270    222 108 253    273.5  134   0 239
+273.5  134   0 239    277     89  72 234
+277     89  72 234    280.5   76 209 252
+280.5   76 209 252    284     25 252 154
+284     25 252 154    287.5   11 208  14
+287.5   11 208  14    291    124 251   0
+291    124 251   0    294.5  242 244   0
+294.5  242 244   0    298    252 126   0
+298    252 126   0    301.5  218  37   9
+301.5  218  37   9    305    253 183 130
 B     0   0   0
 F   255 255 255
 N     0   0   0
