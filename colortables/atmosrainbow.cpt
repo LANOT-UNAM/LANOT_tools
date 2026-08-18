@@ -61,7 +61,7 @@
 259.38  254 254 254   320.00   64  64  64
 
 # Valores especiales
-B     0   0 224   # < 180 K (inalcanzable: el dato se recorta) / nodata con -b
+B     0   0   0   # < 180 K (inalcanzable: el dato se recorta)
 F    64  64  64   # > 320 K, continuacion del gris
 N     0   0   0   # No Data / Cielo Despejado
 
