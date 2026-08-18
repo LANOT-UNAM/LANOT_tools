@@ -340,6 +340,12 @@ class Metadata:
                 ('cldtophght',       'Cloud Top Height',     'm'),
                 ('cld_height_acha',  'Cloud Top Height',     'm'),
                 ('cldbasehght',      'Cloud Base Height',    'm'),
+                # CldTopPres es la variable de JRR-CloudHeight (CSPP ATMOS); el
+                # equivalente de GOES es el producto CTP de ABI, que se pinta con
+                # la misma cld_top_press.cpt. Va aqui arriba, junto a los otros
+                # 'cldtop*', y no estorba a 'cldtoptemp' porque ninguno de los
+                # dos nombres contiene al otro.
+                ('cldtoppres',       'Cloud Top Pressure',   'hPa'),
                 ('cloudphase',       'Cloud Phase',          None),
                 ('cloud_phase',      'Cloud Phase',          None),
                 ('cloudtype',        'Cloud Type',           None),
