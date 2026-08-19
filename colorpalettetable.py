@@ -2,7 +2,25 @@ import os
 import sys
 import math
 import numpy as np
-from PIL import ImageFont, ImageDraw
+from PIL import ImageFont, ImageDraw, ImageColor
+
+def _halo_kwargs(color, font_size):
+    """Contorno de contraste para las etiquetas de la barra de colores.
+
+    Una paleta que recorre todo el espectro (ej. cld_temp_acha.cpt) tiene tramos
+    blancos y tramos negros, asi que ningun color fijo de texto es legible en
+    toda la barra: el -20 se perdia sobre el blanco. El halo resuelve el caso
+    general sin depender del tramo que toque debajo.
+    """
+    stroke_width = max(1, int(font_size) // 12)
+    try:
+        r, g, b = ImageColor.getrgb(color)[:3]
+        lum = 0.299 * r + 0.587 * g + 0.114 * b
+    except Exception:
+        lum = 255
+    return {'stroke_width': stroke_width,
+            'stroke_fill': 'black' if lum >= 128 else 'white'}
+
 
 class ColorPaletteTable:
     """
@@ -394,14 +412,16 @@ class ColorPaletteTable:
             font = ImageFont.truetype("DejaVuSans.ttf", font_size)
         except IOError:
             font = ImageFont.load_default()
+        halo = _halo_kwargs(color, font_size)
 
         def get_w(text):
             try:
-                l, t, r, b = draw.textbbox((0, 0), text, font=font)
+                l, t, r, b = draw.textbbox((0, 0), text, font=font,
+                                           stroke_width=halo['stroke_width'])
                 return r - l
             except AttributeError:
                 w, h = draw.textsize(text, font=font)
-                return w
+                return w + 2 * halo['stroke_width']
 
         items = []
         for value in lista_valores:
@@ -418,7 +438,7 @@ class ColorPaletteTable:
             items.append({'text': self.units, 'x': unit_x})
 
         for item in items:
-            draw.text((item['x'], y), item['text'], fill=color, font=font)
+            draw.text((item['x'], y), item['text'], fill=color, font=font, **halo)
 
     def _draw_label_row(self, draw, x0, y, width, min_val, max_val, offset, labels, color, font_size):
 
@@ -448,14 +468,16 @@ class ColorPaletteTable:
             font = ImageFont.truetype("DejaVuSans.ttf", font_size)
         except IOError:
             font = ImageFont.load_default()
+        halo = _halo_kwargs(color, font_size)
         
         def get_w(text):
             try:
-                l, t, r, b = draw.textbbox((0, 0), text, font=font)
+                l, t, r, b = draw.textbbox((0, 0), text, font=font,
+                                           stroke_width=halo['stroke_width'])
                 return r - l
             except AttributeError:
                 w, h = draw.textsize(text, font=font)
-                return w
+                return w + 2 * halo['stroke_width']
 
         items = []
         for val, label in sorted(labels.items()):
@@ -485,7 +507,7 @@ class ColorPaletteTable:
             items.append({'text': self.units, 'x': unit_x})
 
         for item in items:
-            draw.text((item['x'], y), item['text'], fill=color, font=font)
+            draw.text((item['x'], y), item['text'], fill=color, font=font, **halo)
 
     def _obtener_paso_redondo(self, raw_step):
         if raw_step <= 0: return 0
