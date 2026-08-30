@@ -84,6 +84,71 @@ ejercitaba (`rule(` no aparecía en ningún `.mg` del repo de mg):
   del plot—, contra lo que promete su §9. Ahora obedece al bloque, y sus propios
   argumentos siguen ganando.
 
+## Los datos de prueba, y cómo volver a tenerlos
+
+**No están en el repo ni pueden estarlo**: son 14 gránulos de 3.7 MB cada uno. En
+la máquina donde se desarrolló viven en `~/lanot/datos_nucaps/`. Para rehacerlos
+en otra máquina, de la pasada `j01_d20260829_b45492` (2026-08-29, 19:14–19:22Z,
+1680 FOR entre lat 6.3–35.2 y lon −104.4 a −78.0, que cubre México entero):
+
+```bash
+rsync -av tahan:/data/output/jpss/level2/sounder/NUCAPS-EDR_v3r2_j01_*20260829*.nc \
+      ~/lanot/datos_nucaps/
+```
+
+**Los 14, no uno**: cada gránulo es una rebanada corta del swath y el punto pedido
+puede caer entre dos, así que con uno solo queda sin ejercitar el camino de "FOR
+más cercano entre varios archivos".
+
+Dos puntos con los que se comprobó, y que sirven de referencia porque contrastan:
+
+| | FOR | superficie | CAPE | LCL / LFC / EL |
+|---|---|---|---|---|
+| CDMX (19.4, −99.1) | 19.47N 98.72W, a 40 km | 750 hPa (2240 m) | 43 J/kg | 626 / 559 / 518 |
+| Golfo (20.6, −90.5) | 20.63N 90.48W, a 4 km | nivel del mar | 4772 J/kg | 950 / 868 / 139 |
+
+La suite **no** los necesita: `tests/data/nucaps_perfil_cdmx.npz` son 3.7 kB con el
+perfil real del primero, y el lector se prueba contra un NUCAPS-EDR miniatura
+construido en `tmp_path`.
+
+## Tres arreglos que salieron de llevar la figura al corpus de MG
+
+Al añadir el sondeo del Golfo a `examples/skewt_golfo.mg` de MetaGráfica, sus
+comentarios curados destaparon un defecto y la verificación otros dos:
+
+1. **El ancho del cromo no llegaba.** `line_width` dentro del `plot` no hace nada:
+   el marco, los ejes y la leyenda **no heredan el estado del cuerpo** —solo los
+   `rule`—, así que salían al ancho por omisión de mg. Medido: 18 elementos a
+   `stroke-width="1"` donde debían ir a 0.4. Ahora la sentencia va antes del `plot`.
+2. **`clip()` emitía polilíneas de longitud cero.** `len(s) > 1` no basta: una
+   curva que toca una esquina exacta da dos puntos idénticos.
+3. **La cabecera del `.mg` no se explicaba sola.** Ahora lleva gránulo, FOR,
+   satélite, hora, coordenadas y calidad, porque el `.mg` es un artefacto
+   versionable y puede acabar lejos de su `.nc`.
+
+## Pendientes
+
+Al 2026-08-30, en orden de lo que bloquea a lo que no:
+
+- **`mg` en tahan**: instalarlo y fijarle versión, con el precedente del pin
+  `LANOT_TOOLS_COMMIT`. Es lo único que `install.sh` no puede traer, y sin él la
+  cadena produce `.mg` pero ninguna figura. Necesita el binario del **2026-08-30 o
+  posterior**: antes de esa fecha los `rule` no heredaban el estilo del bloque y
+  las isobaras saldrían negras de 1 pt.
+- **Recopiar el `.mg` al corpus de MG y re-bendecir.** El de `examples/skewt_golfo.mg`
+  es anterior a los tres arreglos de arriba; hay que regenerarlo y correr
+  `./test/run.sh capture`. La golden **debe** cambiar (el marco adelgaza de 1 pt a
+  0.4); si no cambiara, el arreglo no llegó. Ojo: el encabezado de comentarios
+  curado de ese archivo no lo emite el generador, así que la copia lo borra.
+- **El script operativo de la cadena.** Hoy `skewt` se invoca a mano. Falta el
+  equivalente de `crea_vistas_viirs.sh` o `GLMconus_png.sh`, y para eso hace falta
+  antes **la lista de sitios fijos**, que es lo que quedó apuntado al final de
+  `plan_cape_lifted_index.md`.
+- **El logo** (`logos/lanot_logo.mg`): queda para una discusión aparte. Hoy es una
+  figura suelta con su propio `display_size`/`world_window`, así que para ponerlo
+  en el diagrama habría que envolverlo en un `struct` —como ya lo está
+  `lanot_sat.mg`— y decidir cómo resuelve su `include` fuera de su directorio.
+
 ## Cómo se verifica
 
 ```bash
@@ -105,8 +170,5 @@ Lo que hay que mirar en la figura, y por qué:
 - **LFC y EL coherentes con el CAPE de la tabla.** En la CDMX (CAPE 43 J/kg) casi
   se tocan; sobre el Golfo (CAPE 4772) el EL sube a 139 hPa.
 
-Los tests de `thermo.py` corren sin `netCDF4` y sin gránulo: el fixture
-`tests/data/nucaps_perfil_cdmx.npz` son 3.7 kB con un perfil **real** extraído de
-la pasada del 2026-08-29. Los del lector construyen un NUCAPS-EDR miniatura en
-`tmp_path` con la estructura exacta del producto, en vez de versionar los 3.7 MB
-del gránulo.
+La suite completa corre sin gránulo y sin `netCDF4` en el caso de `thermo.py`; de
+dónde salen los datos para el extremo a extremo, arriba.
