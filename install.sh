@@ -73,21 +73,25 @@ else
     echo "  - No se encontraron archivos .cpt en colortables/, omitiendo copia."
 fi
 
-# Logos: el fuente .mg y los renders. Se instala el .mg junto al render a
-# propósito: el logo es el FUENTE, y quien quiera otro tamaño lo recompila con
-# `mg` en vez de escalar un mapa de bits. lanot_sat.mg va con él porque el logo
-# lo incluye, y el include busca LOCAL (junto al archivo principal) antes que la
-# lib de MetaGráfica.
+# Logos: SOLO la salida vectorial (.svg y .pdf). Los `.mg` son el FUENTE y se
+# quedan en el repo: quien quiera otro tamaño o una variante recompila ahí con
+# `mg`, que además necesita `lanot_sat.mg` al lado. Aquí solo va lo que consume
+# quien inserta el logo en un documento.
+#
+# ⚠ Este directorio NO es nuestro en exclusiva: ya vive ahí el juego de logos
+# oficiales en PNG/JPG. Se COPIA encima, nunca se limpia el directorio.
 mkdir -p "${LOGO_DIR}"
-if ls "${SCRIPT_DIR}/logos/"*.mg >/dev/null 2>&1; then
-    cp "${SCRIPT_DIR}/logos/"*.mg "${LOGO_DIR}/"
-    for ext in svg pdf eps; do
-        ls "${SCRIPT_DIR}/logos/"*.${ext} >/dev/null 2>&1 && \
-            cp "${SCRIPT_DIR}/logos/"*.${ext} "${LOGO_DIR}/"
-    done
-    echo "  ✓ Logos copiados desde logos/ a ${LOGO_DIR}"
+_logos=0
+for ext in svg pdf; do
+    if ls "${SCRIPT_DIR}/logos/"*.${ext} >/dev/null 2>&1; then
+        cp "${SCRIPT_DIR}/logos/"*.${ext} "${LOGO_DIR}/"
+        _logos=1
+    fi
+done
+if [ "${_logos}" -eq 1 ]; then
+    echo "  ✓ Logos vectoriales (.svg/.pdf) copiados a ${LOGO_DIR}"
 else
-    echo "  - No se encontraron archivos .mg en logos/, omitiendo copia."
+    echo "  - No se encontraron .svg/.pdf en logos/, omitiendo copia."
 fi
 
 # Paso 5: Crear/actualizar virtualenv

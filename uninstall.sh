@@ -50,10 +50,21 @@ if [ -f "${BIN_WRAPPER_SKT}" ]; then
     echo -e "${GREEN}✓ Eliminado: ${BIN_WRAPPER_SKT}${NC}"
 fi
 
-# Eliminar los logos instalados
-if [ -d "/usr/local/share/lanot/logos" ]; then
-    rm -rf "/usr/local/share/lanot/logos"
-    echo -e "${GREEN}✓ Eliminado: /usr/local/share/lanot/logos${NC}"
+# Eliminar los logos que instalamos — y SOLO ésos.
+# ⚠ Nada de `rm -rf` sobre el directorio: ahí viven también los logos oficiales
+# en PNG/JPG, que no son nuestros. Se quitan por nombre, tomando la lista del
+# propio repo, y el directorio se borra solo si queda vacío.
+LOGO_DIR="/usr/local/share/lanot/logos"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+if [ -d "${LOGO_DIR}" ]; then
+    for f in "${SCRIPT_DIR}/logos/"*.svg "${SCRIPT_DIR}/logos/"*.pdf; do
+        [ -e "$f" ] || continue
+        if [ -f "${LOGO_DIR}/$(basename "$f")" ]; then
+            rm -f "${LOGO_DIR}/$(basename "$f")"
+            echo -e "${GREEN}✓ Eliminado: ${LOGO_DIR}/$(basename "$f")${NC}"
+        fi
+    done
+    rmdir "${LOGO_DIR}" 2>/dev/null && echo -e "${GREEN}✓ Eliminado: ${LOGO_DIR} (quedó vacío)${NC}"
 fi
 
 # Eliminar directorio de instalación
