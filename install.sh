@@ -26,6 +26,7 @@ VENV_DIR="${INSTALL_DIR}/venv"
 SRC_DIR="${INSTALL_DIR}/src"
 BIN_WRAPPER_MD="/usr/local/bin/mapdrawer"
 BIN_WRAPPER_G2V="/usr/local/bin/geotiff2view"
+BIN_WRAPPER_SKT="/usr/local/bin/skewt"
 SHARE_DIR="/usr/local/share/lanot"
 CPT_DIR="${SHARE_DIR}/colortables"
 
@@ -115,11 +116,29 @@ EOF
 chmod +x "${BIN_WRAPPER_G2V}"
 echo "  ✓ Comando ${BIN_WRAPPER_G2V} creado"
 
+cat > "${BIN_WRAPPER_SKT}" << 'EOF'
+#!/bin/bash
+# Wrapper para skewt - ejecuta desde virtualenv
+VENV_DIR="/opt/lanot-tools/venv"
+exec "${VENV_DIR}/bin/skewt" "$@"
+EOF
+
+chmod +x "${BIN_WRAPPER_SKT}"
+echo "  ✓ Comando ${BIN_WRAPPER_SKT} creado"
+
 # Verificación
 echo ""
+# `skewt` compila su figura con `mg` (MetaGráfica), que es un binario C++ fuera de
+# pip: el venv no puede traerlo. Sin él skewt escribe el .mg y avisa, así que no es
+# fatal para la instalación, pero sí hay que decirlo aquí y no descubrirlo en la
+# primera corrida de la cadena.
+if ! command -v mg > /dev/null 2>&1; then
+    echo -e "${YELLOW}  Nota: 'mg' (MetaGráfica) no está en el PATH.${NC}"
+    echo "  skewt escribirá el .mg pero no podrá compilarlo a SVG/PDF/EPS."
+fi
 echo -e "${YELLOW}Verificando instalación...${NC}"
 VERIFY_OK=1
-for cmd in "${BIN_WRAPPER_MD}" "${BIN_WRAPPER_G2V}"; do
+for cmd in "${BIN_WRAPPER_MD}" "${BIN_WRAPPER_G2V}" "${BIN_WRAPPER_SKT}"; do
     if ! salida=$("${cmd}" --help 2>&1); then
         echo -e "${RED}  ✗ Falló '${cmd} --help':${NC}"
         echo "${salida}" | tail -20
@@ -140,7 +159,7 @@ if [ "${VERIFY_OK}" -eq 1 ]; then
     echo ""
     echo "Para desinstalar, ejecute:"
     echo "  $ sudo ${SCRIPT_DIR}/uninstall.sh"
-    echo "  o manualmente: sudo rm -rf ${INSTALL_DIR} ${BIN_WRAPPER_MD} ${BIN_WRAPPER_G2V}"
+    echo "  o manualmente: sudo rm -rf ${INSTALL_DIR} ${BIN_WRAPPER_MD} ${BIN_WRAPPER_G2V} ${BIN_WRAPPER_SKT}"
 else
     echo -e "${RED}✗ Error en la verificación. La instalación puede estar incompleta.${NC}"
     echo "Intente ejecutar manualmente: ${BIN_WRAPPER_MD} --help y ${BIN_WRAPPER_G2V} --help"

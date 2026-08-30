@@ -111,6 +111,51 @@ ash_view_generator.py base.tif ceniza.tif \
 
 El GeoTIFF de ceniza debe ser de **1 banda uint8 con colormap embebido** (formato generado por `detect_ash.py`). Debe estar en la misma proyección que la imagen base; si los CRS difieren el programa informa el error y termina.
 
+### Sondeos NUCAPS: termodiagrama Skew-T Log-P
+
+```bash
+# El FOR más cercano a un punto, entre todos los gránulos de la pasada
+skewt NUCAPS-EDR_v3r2_j01_*.nc --lat 19.4 --lon -99.1 -o cdmx.svg
+
+# Sin coordenadas toma el centro del segmento; --keep-mg conserva el fuente
+skewt NUCAPS-EDR_*.nc -o sondeo.pdf --keep-mg --title "Golfo de México"
+```
+
+A diferencia de las demás herramientas, `skewt` es **solo vectorial**: emite un
+archivo de [MetaGráfica](https://github.com/asierra/Metagrafica) y lo compila con
+`mg`, así que el formato lo elige la extensión de `-o` (`.svg`, `.pdf` o `.eps`) y
+**no hay PNG ni JPEG**. Si `mg` no está instalado, el `.mg` se escribe igual y el
+programa lo avisa.
+
+El diagrama lleva las isolíneas termodinámicas (isotermas, isobaras, adiabáticas
+secas y saturadas, razón de mezcla de saturación), el perfil de temperatura y de
+punto de rocío, la parcela levantada desde la superficie con su LCL, LFC y EL, y
+el CAPE y el Lifted Index **tal como los recuperó NUCAPS** — la parcela la
+calculamos aquí, esos dos números no, y la tabla lo dice.
+
+Dos cosas que conviene saber al leer la figura:
+
+- El perfil arranca en la **presión de la superficie**, no en 1000 hPa. Sobre la
+  Ciudad de México arranca en 750: la banda vacía de abajo es el terreno.
+- NUCAPS es un **swath de campos de regard, no una rejilla**. `--lat/--lon` piden
+  un punto pero lo que se dibuja es el FOR más cercano: el encabezado rotula sus
+  coordenadas reales y su distancia al punto pedido. Con `--max-dist` (100 km por
+  omisión) se descarta si queda demasiado lejos, en vez de dibujar otra cosa.
+
+| Argumento | Descripción |
+|---|---|
+| `--lat LAT --lon LON` | Punto objetivo. Sin ellos, el centro del segmento |
+| `--max-dist KM` | Descarta si el FOR más cercano queda más lejos (def. 100) |
+| `--temp-min/--temp-max` | Límites del eje de temperatura en °C (def. −40, 40) |
+| `--pres-min/--pres-max` | Límites en hPa (def. 100, 1000) |
+| `--skew GRADOS` | Inclinación de las isotermas en la página (def. 45) |
+| `--size ANCHOxALTO` | Tamaño en cm (def. 16x20) |
+| `--quality-any` | Dibuja aunque el `Quality_Flag` marque el retrieval rechazado |
+| `--keep-mg` | Conserva el `.mg` intermedio junto a la salida |
+
+Por omisión un retrieval rechazado **no se dibuja**: un perfil malo sale igual de
+bonito y dice algo que no es. Ver [`docs/plan_skewt.md`](docs/plan_skewt.md).
+
 ### Opciones útiles de mapdrawer
 
 | Argumento | Descripción |

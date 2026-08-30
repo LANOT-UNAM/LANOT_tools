@@ -21,6 +21,7 @@ fi
 INSTALL_DIR="/opt/lanot-tools"
 BIN_WRAPPER_MD="/usr/local/bin/mapdrawer"
 BIN_WRAPPER_G2V="/usr/local/bin/geotiff2view"
+BIN_WRAPPER_SKT="/usr/local/bin/skewt"
 
 echo -e "${YELLOW}=== Desinstalación de LANOT_tools ===${NC}"
 echo ""
@@ -42,6 +43,11 @@ fi
 if [ -f "${BIN_WRAPPER_G2V}" ]; then
     rm -f "${BIN_WRAPPER_G2V}"
     echo -e "${GREEN}✓ Eliminado: ${BIN_WRAPPER_G2V}${NC}"
+fi
+
+if [ -f "${BIN_WRAPPER_SKT}" ]; then
+    rm -f "${BIN_WRAPPER_SKT}"
+    echo -e "${GREEN}✓ Eliminado: ${BIN_WRAPPER_SKT}${NC}"
 fi
 
 # Eliminar directorio de instalación
