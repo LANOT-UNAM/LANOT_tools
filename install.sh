@@ -29,6 +29,7 @@ BIN_WRAPPER_G2V="/usr/local/bin/geotiff2view"
 BIN_WRAPPER_SKT="/usr/local/bin/skewt"
 SHARE_DIR="/usr/local/share/lanot"
 CPT_DIR="${SHARE_DIR}/colortables"
+LOGO_DIR="${SHARE_DIR}/logos"
 
 # Directorio del script (donde está el código fuente)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -70,6 +71,23 @@ if ls "${SCRIPT_DIR}/colortables/"*.cpt >/dev/null 2>&1; then
     echo "  ✓ Tablas de color (.cpt) copiadas desde colortables/ a ${CPT_DIR}"
 else
     echo "  - No se encontraron archivos .cpt en colortables/, omitiendo copia."
+fi
+
+# Logos: el fuente .mg y los renders. Se instala el .mg junto al render a
+# propósito: el logo es el FUENTE, y quien quiera otro tamaño lo recompila con
+# `mg` en vez de escalar un mapa de bits. lanot_sat.mg va con él porque el logo
+# lo incluye, y el include busca LOCAL (junto al archivo principal) antes que la
+# lib de MetaGráfica.
+mkdir -p "${LOGO_DIR}"
+if ls "${SCRIPT_DIR}/logos/"*.mg >/dev/null 2>&1; then
+    cp "${SCRIPT_DIR}/logos/"*.mg "${LOGO_DIR}/"
+    for ext in svg pdf eps; do
+        ls "${SCRIPT_DIR}/logos/"*.${ext} >/dev/null 2>&1 && \
+            cp "${SCRIPT_DIR}/logos/"*.${ext} "${LOGO_DIR}/"
+    done
+    echo "  ✓ Logos copiados desde logos/ a ${LOGO_DIR}"
+else
+    echo "  - No se encontraron archivos .mg en logos/, omitiendo copia."
 fi
 
 # Paso 5: Crear/actualizar virtualenv

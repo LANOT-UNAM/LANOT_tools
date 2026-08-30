@@ -50,6 +50,12 @@ if [ -f "${BIN_WRAPPER_SKT}" ]; then
     echo -e "${GREEN}✓ Eliminado: ${BIN_WRAPPER_SKT}${NC}"
 fi
 
+# Eliminar los logos instalados
+if [ -d "/usr/local/share/lanot/logos" ]; then
+    rm -rf "/usr/local/share/lanot/logos"
+    echo -e "${GREEN}✓ Eliminado: /usr/local/share/lanot/logos${NC}"
+fi
+
 # Eliminar directorio de instalación
 if [ -d "${INSTALL_DIR}" ]; then
     rm -rf "${INSTALL_DIR}"
