@@ -21,7 +21,7 @@
 % base—, la altura de mayúscula sale del cuerpo de la letra (0.717 em en Helvetica),
 % y el LIENZO sale de lo dibujado. Cambiar `size` reacomoda todo junto.
 
-include "fulldisk_map.mg"
+include "fulldisk_logo.mg"
 include "lanot_sat.mg"
 
 size = 60                       % cuerpo de la palabra, en pt
