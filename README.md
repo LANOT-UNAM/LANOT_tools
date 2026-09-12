@@ -52,7 +52,7 @@ geotiff2view datos.tif --cpt sst.cpt --alpha \
 
 # Composición RGB (tres archivos separados por coma: R,G,B)
 geotiff2view banda_roja.tif,banda_verde.tif,banda_azul.tif \
-  --layer COASTLINE:yellow:1.0 --layer COUNTRIES:gray:0.5 \
+  --layer COASTLINE:yellow:1.0 --layer COUNTRIES:gray:0.0005 \
   -o rgb_composite.png
 
 # Agregar grilla lat/lon con etiquetas (intervalos de 5°, 10°, 15°...)
@@ -69,7 +69,7 @@ Los GeoTIFFs generados por CSPP VIIRS ATMOS (ej. `noaa20_viirs_CldTopTemp_*.tif`
 # Temperatura cloud-top: barra de color automática desde el colormap del TIFF
 mapdrawer noaa20_viirs_CldTopTemp_20260508_192713_wgs84_fit.tif \
   --colorbar \
-  --layer COASTLINE:white:1.0 --layer MEXSTATES:yellow:0.5 \
+  --layer COASTLINE:white:1.0 --layer MEXSTATES:yellow:0.0005 \
   --timestamp-pos 2 --logo-pos 3 \
   -o CldTopTemp_20260508_1927.png
 
@@ -92,8 +92,8 @@ El campo **unidades** (K, m, etc.) se detecta automáticamente del nombre del ar
 ### Post-procesamiento de imágenes existentes
 
 ```bash
-# Agregar overlays a imagen sin metadata GeoTIFF
-mapdrawer imagen.png --metadata metadata.json \
+# Agregar overlays a un PNG de hpsv, georreferenciado con su Item de STAC (hpsv -j)
+mapdrawer imagen.png --metadata hpsv_G16_conus_2024220_1302_ash.json \
   --layer COASTLINE:blue:1.0 \
   --logo-pos 3 --timestamp "2026-01-30 12:00 UTC" \
   -o output.png
@@ -161,8 +161,8 @@ bonito y dice algo que no es. Ver [`docs/plan_skewt.md`](docs/plan_skewt.md).
 | Argumento | Descripción |
 |---|---|
 | `--bounds ULX,ULY,LRX,LRY` | Límites geográficos de la imagen (si no vienen del GeoTIFF) |
-| `--crs CRS` | Sistema de coordenadas: `goes16`, `goes18`, `epsg:4326`, Proj4... |
-| `--metadata FILE` | JSON sidecar con CRS, bounds y timestamp para imágenes sin georref. |
+| `--crs CRS` | Sistema de coordenadas: `epsg:4326`, cadena Proj4 o WKT |
+| `--metadata FILE` | Item de STAC de `hpsv -j` (CRS, límites y fecha) para imágenes sin georref. Con varios activos (`-B`) usa el que se llama como la imagen |
 | `--clip REGION` | Recortar a región: `ULX,ULY,LRX,LRY` o nombre predefinido (`conus`, `fulldisk`) |
 | `--layer NOMBRE:COLOR:GROSOR[:labels]` | Capa vectorial (`COASTLINE`, `COUNTRIES`, `MEXSTATES`) o grilla (`grid10`) |
 | `--logo-pos N` | Posición del logo (0=UL, 1=UR, 2=LL, 3=LR) |
@@ -193,7 +193,7 @@ bonito y dice algo que no es. Ver [`docs/plan_skewt.md`](docs/plan_skewt.md).
 | `--timestamp-pos N` | Posición del timestamp (0-3); sin `--timestamp` usa el del metadata o UTC actual |
 | `--font-color C` | Color del texto del timestamp (default: `white`) |
 | `--scale S` | Factor de escala para la imagen de salida (default: 1.0) |
-| `--crs CRS` | Override del CRS (ej: `goes16`, `epsg:4326`) |
+| `--crs CRS` | Override del CRS (ej: `epsg:4326`, Proj4 o WKT) |
 
 ### Opciones útiles de geotiff2view| Argumento | Descripción |
 |---|---|
@@ -242,7 +242,7 @@ with rasterio.open("datos.tif") as src:
     img = Image.open("datos.tif")
 
 # Configurar mapa con proyección
-mapper = MapDrawer(target_crs='goes16')
+mapper = MapDrawer(target_crs=metadata.get('crs'))
 mapper.set_image(img)
 
 # Usar bounds del metadata

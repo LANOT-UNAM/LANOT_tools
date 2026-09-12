@@ -118,7 +118,7 @@ geotiff2view input.tif --cpt sst.cpt --alpha \
 
 # Post-process existing image
 mapdrawer image.png --recorte conus --crs goes16 \
-  --layer COUNTRIES:gray:0.5 --timestamp "2026-01-30 12:00 UTC"
+  --layer COUNTRIES:gray:0.0005 --timestamp "2026-01-30 12:00 UTC"
 ```
 
 **Critical CLI arguments:**

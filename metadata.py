@@ -183,7 +183,124 @@ class Metadata:
         with open(filepath, 'r') as f:
             data = json.load(f)
         return cls.from_dict(data)
-    
+
+    @classmethod
+    def from_stac_item(cls, item, image_path=None):
+        """
+        Build Metadata from the STAC Item that `hpsv -j` writes.
+
+        Fills 'crs', 'bounds', 'timestamp', 'satellite' and 'product'. The
+        grid comes from the asset the image belongs to, never from the root
+        'bbox': that one is the 4326 footprint (the limb curve), not the
+        raster extent, and using it would misplace every overlay.
+
+        Args:
+            item (dict): Parsed STAC Item.
+            image_path (str, optional): Image being drawn. Its basename picks
+                the asset when the Item has several (hpsv -B writes two).
+
+        Returns:
+            Metadata: Instance with bounds as (left, bottom, right, top) in
+            the asset's own CRS (metres on the fixed grid, degrees in 4326).
+
+        Raises:
+            ValueError: If the JSON is not a STAC Item, the asset cannot be
+                chosen, or it declares no CRS or no grid.
+        """
+        if (not isinstance(item, dict) or item.get('type') != 'Feature'
+                or 'stac_version' not in item):
+            raise ValueError(
+                "el JSON no es un Item de STAC. --metadata espera el Item que "
+                "escribe 'hpsv -j'; el sidecar plano con 'crs' y 'bounds' en "
+                "la raíz ya no se emite ni se lee.")
+
+        props = item.get('properties') or {}
+        assets = item.get('assets') or {}
+        key, asset = cls._pick_stac_asset(assets, image_path)
+        label = f"el activo '{key}' ({asset.get('href')})" if key else "el Item"
+
+        # Con -B el Item lleva dos rásteres en rejillas distintas y el proj:*
+        # de las propiedades sólo describe uno de ellos (el último escrito), así
+        # que únicamente se le cree cuando no hay ambigüedad posible.
+        unambiguous = len(assets) <= 1
+        grid_sources = [asset, props] if unambiguous else [asset]
+
+        transform = shape = crs = None
+        for src in grid_sources:
+            if transform is None and src.get('proj:transform') is not None:
+                transform, shape = src['proj:transform'], src.get('proj:shape')
+            if crs is None:
+                if src.get('proj:wkt2'):
+                    crs = src['proj:wkt2']
+                elif src.get('proj:epsg'):
+                    crs = f"EPSG:{src['proj:epsg']}"
+
+        if crs is None:
+            raise ValueError(
+                f"{label} no declara CRS en el Item (ni proj:wkt2 ni proj:epsg)")
+        if not transform or not shape:
+            raise ValueError(
+                f"{label} no declara proj:transform y proj:shape en el Item")
+
+        # Orden de STAC, que no es el de GDAL: [a, b, c, d, e, f] con
+        # x = a·col + b·fila + c  e  y = d·col + e·fila + f.
+        a, b, c, d, e, f = transform
+        if b or d:
+            raise ValueError(f"{label} tiene una rejilla rotada, no soportada")
+        height, width = shape
+        x0, x1 = c, c + a * width
+        y0, y1 = f, f + e * height
+
+        meta = cls()
+        meta['crs'] = crs
+        meta['bounds'] = (min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1))
+        if props.get('datetime'):
+            meta['timestamp'] = props['datetime']
+        platform = props.get('platform')
+        if platform:
+            # Forma corta, la de los nombres de archivo y la de CIMSS o CIRA:
+            # goes-19 → G19. Otras plataformas, en mayúsculas.
+            m = re.fullmatch(r'goes-(\d+)', platform.strip().lower())
+            meta['satellite'] = f"G{m.group(1)}" if m else platform.upper()
+        if props.get('hpsv:product'):
+            meta['product'] = props['hpsv:product']
+        return meta
+
+    @staticmethod
+    def _pick_stac_asset(assets, image_path):
+        """Return (key, asset) for the image, matching by href basename."""
+        if image_path:
+            name = os.path.basename(image_path)
+            for key, asset in assets.items():
+                if os.path.basename(asset.get('href', '')) == name:
+                    return key, asset
+        if len(assets) == 1:
+            return next(iter(assets.items()))
+        if not assets:
+            return None, {}
+        hrefs = ", ".join(sorted(a.get('href', '?') for a in assets.values()))
+        wanted = f"ninguno se llama '{os.path.basename(image_path)}'" \
+            if image_path else "no se indicó la imagen"
+        raise ValueError(
+            f"el Item describe varios activos ({hrefs}) y {wanted}")
+
+    @classmethod
+    def from_stac_item_file(cls, filepath, image_path=None):
+        """
+        Load a STAC Item from disk; see from_stac_item().
+
+        Raises:
+            FileNotFoundError: If file doesn't exist
+            json.JSONDecodeError: If file is not valid JSON
+            ValueError: As from_stac_item()
+        """
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"Metadata file not found: {filepath}")
+
+        with open(filepath, 'r') as f:
+            item = json.load(f)
+        return cls.from_stac_item(item, image_path=image_path)
+
     def save_json(self, filepath):
         """
         Save metadata to JSON file.

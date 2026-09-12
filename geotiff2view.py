@@ -24,13 +24,15 @@ from datetime import datetime
 from colorpalettetable import ColorPaletteTable
 from metadata import Metadata
 try:
-    from mapdrawer import MapDrawer, make_south_room
+    from mapdrawer import MapDrawer, make_south_room, calculate_size, layer_width
 except ImportError as e:
     # Fallback si el nombre del archivo o path varía
     try:
         import MapDrawer as md
         MapDrawer = md.MapDrawer
         make_south_room = md.make_south_room
+        calculate_size = md.calculate_size
+        layer_width = md.layer_width
     except ImportError:
         # Si falla, mostramos el error original
         print(f"Advertencia: No se pudo importar MapDrawer. Detalle: {e}\n(Se omitirán las decoraciones de mapa)", file=sys.stderr)
@@ -315,28 +317,6 @@ def load_geotiff(filepath, n_idx=None, f_idx=None, offset=0, scale_factor=1.0, r
 
         return img, metadata
 
-def calculate_size(value, ref_size, default=0):
-    """Calcula tamaño en píxeles. Soporta enteros (px), floats <= 1.0 (escala) y porcentajes (%)."""
-    if value is None:
-        return default
-    
-    s_val = str(value).strip()
-    if s_val.endswith('%'):
-        try:
-            pct = float(s_val[:-1])
-            return int(ref_size * pct / 100.0)
-        except ValueError:
-            return default
-            
-    try:
-        val = float(s_val)
-        # Si es <= 1.0, asumimos que es un factor de escala (0.1 = 10%)
-        if 0 < val <= 1.0:
-            return int(ref_size * val)
-        return int(val)
-    except ValueError:
-        return default
-
 def main():
     global VERBOSE
     parser = argparse.ArgumentParser(
@@ -353,12 +333,13 @@ def main():
     parser.add_argument("--backcolor", "-b", action="store_true", help="Usar color B (Background) para Nodata")
     parser.add_argument("--invert", "-i", action="store_true", help="Invertir colores (blanco/negro o paleta)")
     parser.add_argument("--scale", "-s", type=float, help="Factor de escala para redimensionar la imagen (ej. 0.5)")
-    parser.add_argument("--layer", action="append", help="Capa a dibujar: NOMBRE:COLOR:GROSOR (ej. COASTLINE:blue:0.5)")
+    parser.add_argument("--layer", action="append", help="Capa a dibujar: NOMBRE:COLOR:GROSOR. GROSOR < 1 es fracción del ancho, "
+                             ">= 1 píxeles, N%% porcentaje (ej. COASTLINE:blue:0.0005)")
     parser.add_argument("--logo-pos", type=int, choices=[0, 1, 2, 3], help="Posición del logo (0-3)")
-    parser.add_argument("--logo-size", default="128", help="Tamaño del logo (píxeles o porcentaje del ancho)")
+    parser.add_argument("--logo-size", default="128", help="Tamaño del logo: fracción del ancho si es < 1, píxeles si es >= 1, o porcentaje (N%%)")
     parser.add_argument("--timestamp", help="Texto de la fecha/hora a mostrar.")
     parser.add_argument("--timestamp-pos", type=int, choices=[0, 1, 2, 3], help="Posición de la fecha (0-3).")
-    parser.add_argument("--font-size", help="Tamaño de fuente (píxeles o porcentaje del ancho)")
+    parser.add_argument("--font-size", help="Tamaño de fuente: fracción del ancho si es < 1, píxeles si es >= 1, o porcentaje (N%%)")
     parser.add_argument("--font-color", default="yellow", help="Color de la fuente del timestamp")
     # Misma bandera que mapdrawer, que la tiene desde antes: aquí faltaba el paso
     # por la CLI, aunque draw_fecha ya sabía dibujar el fondo.
@@ -668,7 +649,8 @@ def main():
                         parts = layer_def.split(':')
                         name = parts[0]
                         color = parts[1] if len(parts) > 1 else 'yellow'
-                        width = float(parts[2]) if len(parts) > 2 else 1.0
+                        width = layer_width(parts[2] if len(parts) > 2 else None,
+                                            mapper.image.width, name=f"--layer {layer_def}")
                         
                         if name.startswith('grid'):
                             try:

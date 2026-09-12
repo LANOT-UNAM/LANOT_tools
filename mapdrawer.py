@@ -59,20 +59,10 @@ def debug_msg(msg):
         print(f"[DEBUG] {msg}", file=sys.stderr)
 
 
-# Proyecciones GOES predefinidas
-GOES_PROJECTIONS = {
-    'goes16': '+proj=geos +h=35786023.0 +lon_0=-75.0 +sweep=x +a=6378137.0 +b=6356752.31414 +units=m +no_defs',
-    'goes17': '+proj=geos +h=35786023.0 +lon_0=-137.0 +sweep=x +a=6378137.0 +b=6356752.31414 +units=m +no_defs',
-    'goes18': '+proj=geos +h=35786023.0 +lon_0=-137.0 +sweep=x +a=6378137.0 +b=6356752.31414 +units=m +no_defs',
-    'goes19': '+proj=geos +h=35786023.0 +lon_0=-75.0 +sweep=x +a=6378137.0 +b=6356752.31414 +units=m +no_defs',
-}
-
-def _resolve_crs(crs_name):
-    """Resuelve un alias corto de CRS (ej. 'goes18') a su string Proj4/EPSG completo."""
-    if crs_name is None:
-        return None
-    resolved = GOES_PROJECTIONS.get(crs_name.lower(), crs_name)
-    return resolved
+def _crs_label(crs):
+    """Versión corta de un CRS para mensajes: un WKT2 completo ocupa pantallas."""
+    crs = str(crs)
+    return crs if len(crs) <= 80 else crs[:77] + '...'
 
 
 def warp_pil_image(img, src_crs, src_bounds, dst_crs):
@@ -80,7 +70,7 @@ def warp_pil_image(img, src_crs, src_bounds, dst_crs):
 
     Args:
         img (PIL.Image): Imagen fuente (modo RGB o RGBA).
-        src_crs (str): CRS de la imagen fuente (Proj4, EPSG, o alias GOES).
+        src_crs (str): CRS de la imagen fuente (EPSG, Proj4 o WKT).
         src_bounds (tuple): Límites fuente (left, bottom, right, top) en unidades de src_crs.
         dst_crs (str): CRS destino (ej. 'epsg:3857').
 
@@ -100,8 +90,8 @@ def warp_pil_image(img, src_crs, src_bounds, dst_crs):
     from rasterio.warp import Resampling
     from rasterio.crs import CRS
 
-    src_crs_obj = CRS.from_user_input(_resolve_crs(src_crs))
-    dst_crs_obj = CRS.from_user_input(_resolve_crs(dst_crs))
+    src_crs_obj = CRS.from_user_input(src_crs)
+    dst_crs_obj = CRS.from_user_input(dst_crs)
 
     left, bottom, right, top = src_bounds
     src_w, src_h = img.size
@@ -197,8 +187,7 @@ class MapDrawer:
 
         Args:
             lanot_dir (str): Ruta base de los recursos (shapefiles/logos).
-            target_crs (str, opcional): Código EPSG (ej. 'epsg:3857'), string Proj4, 
-                                        o clave corta GOES ('goes16', 'goes17', 'goes18').
+            target_crs (str, opcional): Código EPSG (ej. 'epsg:3857'), string Proj4 o WKT, 
                                         Si es None, usa proyección lineal (Plate Carrée).
         """
         self.lanot_dir = lanot_dir
@@ -220,20 +209,12 @@ class MapDrawer:
 
         if target_crs:
             debug_msg(f"MapDrawer init con target_crs='{target_crs}'")
-            # Resolver claves cortas de GOES
-            crs_lower = target_crs.lower()
-            if crs_lower in GOES_PROJECTIONS:
-                resolved_crs = GOES_PROJECTIONS[crs_lower]
-                print(f"Info: Resolviendo '{target_crs}' a proyección GOES.")
-            else:
-                resolved_crs = target_crs
-
             if HAS_PYPROJ:
                 # 'always_xy=True' asegura el orden (lon, lat)
                 self.transformer = Transformer.from_crs(
-                    "epsg:4326", resolved_crs, always_xy=True)
+                    "epsg:4326", target_crs, always_xy=True)
                 self.use_proj = True
-                print(f"Info: Usando proyección {target_crs} vía pyproj.")
+                print(f"Info: Usando proyección {_crs_label(target_crs)} vía pyproj.")
             else:
                 print(
                     "Advertencia: pyproj no está instalado. Se usará proyección lineal simple.")
@@ -1138,7 +1119,11 @@ class MapDrawer:
 
 
 def calculate_size(value, ref_size, default=0):
-    """Calcula tamaño en píxeles. Soporta enteros (px), floats <= 1.0 (escala) y porcentajes (%)."""
+    """Calcula tamaño en píxeles: 0 < v < 1 es fracción de ref_size, v >= 1 son píxeles y 'N%' porcentaje.
+
+    Es la única regla de tamaños de mapdrawer, geotiff2view y ash_view_generator
+    (logo, fuente, figuras y grosor de capas).
+    """
     if value is None:
         return default
 
@@ -1152,12 +1137,36 @@ def calculate_size(value, ref_size, default=0):
 
     try:
         val = float(s_val)
-        # Si es <= 1.0, asumimos que es un factor de escala (0.1 = 10%)
-        if 0 < val <= 1.0:
+        # Menor que 1: fracción de ref_size (0.1 = 10 %). 1 ya es un píxel, no
+        # la imagen entera, que es lo que nadie quiere decir con '1'.
+        if 0 < val < 1.0:
             return int(ref_size * val)
         return int(val)
     except ValueError:
         return default
+
+
+def layer_width(width_arg, ref_size, name="--layer"):
+    """Grosor de línea de una capa en píxeles, con la regla de calculate_size().
+
+    Sin grosor, 1 px. Avisa cuando un grosor relativo pasa del 1 % del ancho:
+    casi seguro es un grosor pensado en píxeles o puntos --en GMT o QGIS 0.5 es
+    «línea fina»-- que aquí se lee como media imagen. Sólo avisa; el guion decide.
+    """
+    s_val = str(width_arg).strip() if width_arg is not None else ''
+    if not s_val:
+        s_val = '1'
+    width = max(1, calculate_size(s_val, ref_size, 1))
+    try:
+        relative = s_val.endswith('%') or 0 < float(s_val) < 1.0
+    except ValueError:
+        relative = False
+    if relative and ref_size and width > ref_size * 0.01:
+        print(f"Advertencia: el grosor '{s_val}' de {name} da líneas de {width} px "
+              f"({100.0 * width / ref_size:.0f} % del ancho). Un grosor relativo de "
+              f"línea suele ser ~0.0005; para píxeles use un entero >= 1.",
+              file=sys.stderr)
+    return width
 
 
 def make_south_room(img, metadata, lat_south, compress=False, n_idx=None):
@@ -1258,8 +1267,9 @@ def main():
 
     # Capas
     parser.add_argument("--layer", action="append",
-                        help="Capa a dibujar: NOMBRE:COLOR:GROSOR[:LABELS] "
-                             "(ej: COASTLINE:blue:0.5, grid15:white:1.0:labels)")
+                        help="Capa a dibujar: NOMBRE:COLOR:GROSOR[:LABELS]. GROSOR < 1 es fracción "
+                             "del ancho de la imagen, >= 1 píxeles, N%% porcentaje; sin GROSOR, 1 px "
+                             "(ej: COASTLINE:blue:0.0005, grid15:white:1:labels)")
     parser.add_argument("--shape", action="append",
                         help="Figura geométrica de relleno sólido: TIPO:LON:LAT:TAMAÑO:COLOR "
                              "(ej: triangle:-99.13:19.43:0.02:red). Tipos soportados: triangle. "
@@ -1267,13 +1277,13 @@ def main():
 
     # Proyección
     parser.add_argument(
-        "--crs", help="Sistema de coordenadas (ej: 'goes16', 'epsg:4326').")
+        "--crs", help="Sistema de coordenadas (ej: 'epsg:4326', cadena Proj4 o WKT).")
 
     # Logo
     parser.add_argument("--logo-pos", type=int,
                         choices=[0, 1, 2, 3], help="Posición del logo (0-3)")
     parser.add_argument(
-        "--logo-size", help="Tamaño del logo (píxeles, float <= 1.0 o porcentaje)")
+        "--logo-size", help="Tamaño del logo: fracción del ancho si es < 1, píxeles si es >= 1, o porcentaje (N%%)")
 
     # Fecha
     parser.add_argument(
@@ -1281,7 +1291,7 @@ def main():
     parser.add_argument("--timestamp-pos", type=int, choices=[
                         0, 1, 2, 3], help="Posición de la fecha (0-3). Si se especifica sin --timestamp, usa fecha actual.")
     parser.add_argument(
-        "--font-size", help="Tamaño de fuente (píxeles, float <= 1.0 o porcentaje)")
+        "--font-size", help="Tamaño de fuente: fracción del ancho si es < 1, píxeles si es >= 1, o porcentaje (N%%)")
     parser.add_argument("--font-color", default="yellow",
                         help="Color de fuente")
     parser.add_argument("--font-bg", default=None,
@@ -1297,7 +1307,8 @@ def main():
                         help="Posición del texto en la barra de colores (below/middle/above, default: below). "
                              "Implica --colorbar si no se especifica.")
     parser.add_argument(
-        "--metadata",  "-m", help="Archivo JSON con metadatos (CRS, bounds, timestamp) para imágenes sin georreferencia.")
+        "--metadata",  "-m", help="Item de STAC escrito por 'hpsv -j' (CRS, límites y fecha) para imágenes sin "
+                                  "georreferencia. Con varios activos (-B) se usa el que se llama como la imagen.")
     parser.add_argument("--legend-pos", type=int,
                         choices=[0, 1, 2, 3], help="Posición de la leyenda (0-3)")
     parser.add_argument("--scale", "-s", type=float,
@@ -1370,26 +1381,25 @@ def main():
             debug_msg(f"Excepción leyendo rasterio: {e}")
             pass
 
-    # Cargar metadatos externos si se proporcionan (tienen prioridad o llenan vacíos)
-    if args.metadata and os.path.exists(args.metadata):
+    # Item de STAC de hpsv -j: tiene prioridad sobre lo leído del archivo.
+    # Falla en voz alta: sin él la imagen se decora sin georreferencia y el
+    # error sólo se vería en el producto publicado.
+    if args.metadata:
+        if not os.path.exists(args.metadata):
+            print(f"Error: --metadata '{args.metadata}' no existe.", file=sys.stderr)
+            sys.exit(1)
         try:
-            external_meta = Metadata.from_json_file(args.metadata)
-            debug_msg(
-                f"Cargando metadatos externos: {external_meta.to_dict()}")
+            external_meta = Metadata.from_stac_item_file(
+                args.metadata, image_path=args.input_image)
+        except (ValueError, OSError) as e:
+            print(f"Error leyendo --metadata '{args.metadata}': {e}", file=sys.stderr)
+            sys.exit(1)
+        debug_msg(f"Cargando metadatos externos: {external_meta.to_dict()}")
 
-            # Sobrescribir o llenar campos del metadata
-            for key in ['crs', 'timestamp', 'satellite']:
-                if key in external_meta:
-                    metadata[key] = external_meta[key]
-
-            # Bounds necesitan conversión de formato JSON [minx, miny, maxx, maxy] a rasterio (left, bottom, right, top)
-            if 'bounds' in external_meta:
-                b = external_meta['bounds']
-                if len(b) == 4:
-                    # JSON: [minx, miny, maxx, maxy] -> rasterio: (left, bottom, right, top)
-                    metadata['bounds'] = (b[0], b[1], b[2], b[3])
-        except Exception as e:
-            print(f"Error leyendo metadatos externos: {e}", file=sys.stderr)
+        # crs y bounds llegan juntos: son la rejilla del mismo activo.
+        for key in ['crs', 'bounds', 'timestamp', 'satellite']:
+            if key in external_meta:
+                metadata[key] = external_meta[key]
 
     try:
         img = Image.open(args.input_image).convert(
@@ -1438,7 +1448,7 @@ def main():
             print("Error: --o_crs requiere que los metadatos tengan 'bounds'.", file=sys.stderr)
             sys.exit(1)
         src_bounds = tuple(metadata['bounds'])  # (left, bottom, right, top)
-        print(f"Info: Reproyectando de '{src_crs}' a '{o_crs_used}'...")
+        print(f"Info: Reproyectando de '{_crs_label(src_crs)}' a '{o_crs_used}'...")
         try:
             img, dst_transform, dst_w, dst_h, new_bounds = warp_pil_image(
                 img, src_crs, src_bounds, o_crs_used)
@@ -1452,7 +1462,7 @@ def main():
     # 2. Inicializar MapDrawer
     target_crs = args.crs if args.crs else metadata.get('crs')
     if target_crs and target_crs == metadata.get('crs'):
-        print(f"Info: Usando CRS detectado: {target_crs}")
+        print(f"Info: Usando CRS detectado: {_crs_label(target_crs)}")
     debug_msg(f"Inicializando MapDrawer con CRS: {target_crs}")
     mapper = MapDrawer(target_crs=target_crs)
     mapper.set_image(img)
@@ -1583,8 +1593,8 @@ def main():
             parts = layer_def.split(':')
             name = parts[0]
             color = parts[1] if len(parts) > 1 else 'yellow'
-            width_arg = parts[2] if len(parts) > 2 else "0.5"
-            width = calculate_size(width_arg, img_width, 1)
+            width_arg = parts[2] if len(parts) > 2 else None
+            width = layer_width(width_arg, img_width, name=f"--layer {layer_def}")
             
             # Detectar si la capa solicitada es una grilla
             if name.startswith('grid'):
@@ -1594,7 +1604,6 @@ def main():
                 except ValueError:
                     interval = 10  # Valor por defecto si solo ponen 'grid'
 
-                width = calculate_size(width_arg, img_width, 1)
                 # Verificar si se pidieron etiquetas (cuarto parámetro)
                 labels = False
                 if len(parts) > 3 and parts[3].lower() in ('labels', 'label', 'l'):
@@ -1820,7 +1829,7 @@ def main():
                 width=arr.shape[1],
                 count=n_bands,
                 dtype=arr.dtype,
-                crs=RioCRS.from_user_input(_resolve_crs(o_crs_used)),
+                crs=RioCRS.from_user_input(o_crs_used),
                 transform=dst_transform,
             ) as dst:
                 for i in range(n_bands):

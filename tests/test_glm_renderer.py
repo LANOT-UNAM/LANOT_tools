@@ -29,7 +29,7 @@ from PIL import Image
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from metadata import Metadata
-from glm_renderer import render_glm_layer, GOES_PROJECTIONS
+from glm_renderer import render_glm_layer
 from glm_renderer import (HAS_RASTERIO, GRID_VARS, accumulate_glm_grids,
                           cpt_grid_breaks, render_glm_grid_layer)
 
@@ -37,8 +37,6 @@ from glm_renderer import (HAS_RASTERIO, GRID_VARS, accumulate_glm_grids,
 # ---------------------------------------------------------------------------
 # Fixtures y helpers
 # ---------------------------------------------------------------------------
-
-GOES18_CRS = GOES_PROJECTIONS['goes18']
 
 # Para tests unitarios usamos epsg:4326 (proyección identidad lat/lon) para que
 # los bounds sean trivialmente correctos y no dependan de cálculos GOES por satélite.

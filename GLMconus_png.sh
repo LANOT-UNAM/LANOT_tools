@@ -57,8 +57,8 @@ fi
 mapdrawer base.tif \
     --glm "${glm_files[@]}" \
     --glm-color yellow \
-    --layer COASTLINE:white:1.0 \
-    --layer MEXSTATES:white:0.5 \
+    --layer COASTLINE:white:0.0005 \
+    --layer MEXSTATES:white:0.0005 \
     --logo-pos 0 \
     --timestamp-pos 3 \
     -o "$outfile.png"

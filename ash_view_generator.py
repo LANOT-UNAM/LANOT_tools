@@ -194,7 +194,7 @@ if __name__ == '__main__':
         sys.exit(1)
 
     from metadata import Metadata
-    from mapdrawer import MapDrawer
+    from mapdrawer import MapDrawer, layer_width
 
     parser = argparse.ArgumentParser(
         description="Superpone detección de ceniza volcánica sobre imagen ABI.")
@@ -206,7 +206,8 @@ if __name__ == '__main__':
                         help="Archivo PNG de salida (default: ash_output.png).")
     parser.add_argument("--layer", action="append", metavar="NOMBRE:COLOR:GROSOR",
                         help="Capa vectorial a dibujar. Puede repetirse. "
-                             "Ej: MEXSTATES:white:1.0")
+                             "GROSOR < 1 es fracción del ancho, >= 1 píxeles. "
+                             "Ej: MEXSTATES:white:0.0005")
     parser.add_argument("--logo-pos", type=int, choices=[0, 1, 2, 3],
                         metavar="POS",
                         help="Posición del logo LANOT (0=UL 1=UR 2=LL 3=LR).")
@@ -226,7 +227,7 @@ if __name__ == '__main__':
                         metavar="FACTOR",
                         help="Factor de escala para la imagen de salida (default: 1.0).")
     parser.add_argument("--crs",
-                        help="Override del CRS (ej: goes16, epsg:4326). "
+                        help="Override del CRS (ej: epsg:4326, cadena Proj4 o WKT). "
                              "Por defecto se toma del GeoTIFF base.")
     args = parser.parse_args()
 
@@ -300,7 +301,8 @@ if __name__ == '__main__':
                 parts = layer_def.split(':')
                 name  = parts[0]
                 color = parts[1] if len(parts) > 1 else 'white'
-                width = float(parts[2]) if len(parts) > 2 else 1.0
+                width = layer_width(parts[2] if len(parts) > 2 else None,
+                                    mapper.image.width, name=f"--layer {layer_def}")
                 mapper.draw_layer(name, color=color, width=width)
 
         # Logo

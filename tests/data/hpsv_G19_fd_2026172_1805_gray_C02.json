@@ -1,0 +1,82 @@
+{"type": "Feature",
+"stac_version": "1.0.0",
+"stac_extensions": [
+  "https://stac-extensions.github.io/projection/v1.1.0/schema.json",
+  "https://stac-extensions.github.io/eo/v1.1.0/schema.json",
+  "https://stac-extensions.github.io/processing/v1.1.0/schema.json"
+],
+"id": "hpsv_G19_fd_2026172_1805_gray_C02",
+"geometry": {
+  "type": "Polygon",
+  "coordinates": [[[-152.802668, -44.373117], [-152.402641, -46.181271], [-151.932521, -48.102307], [-151.375119, -50.141510], [-150.707953, -52.303272], [-149.900699, -54.590560], [-148.911547, -57.004224], [-147.681904, -59.542118], [-146.127142, -62.197822], [-144.120776, -64.958729], [-141.468122, -67.803239], [-137.856844, -70.695651], [-132.766333, -73.576452], [-125.310224, -76.342515], [-114.039906, -78.806126], [-97.186213, -80.628658], [-75.000008, -81.328235], [-52.813733, -80.628686], [-35.960117, -78.806125], [-24.689742, -76.342525], [-17.233590, -73.576468], [-12.143085, -70.695665], [-8.531821, -67.803251], [-5.879287, -64.958722], [-3.872997, -62.197805], [-2.318111, -59.542119], [-1.088449, -57.004226], [-0.099308, -54.590561], [0.708012, -52.303281], [1.375121, -50.141512], [1.932585, -48.102317], [2.402678, -46.181277], [2.802708, -44.373123], [3.166754, -42.562254], [3.518949, -40.632325], [3.857825, -38.576630], [4.181974, -36.388961], [4.489848, -34.063914], [4.779563, -31.597263], [5.049553, -28.986477], [5.297827, -26.231158], [5.522665, -23.333626], [5.722132, -20.299382], [5.894538, -17.137553], [6.038107, -13.861140], [6.151450, -10.487081], [6.233405, -7.035991], [6.282886, -3.531617], [6.299445, 0.000001], [6.282872, 3.531620], [6.233375, 7.035993], [6.151462, 10.487084], [6.038137, 13.861144], [5.894502, 17.137553], [5.722152, 20.299385], [5.522690, 23.333630], [5.297882, 26.231164], [5.049509, 28.986476], [4.779591, 31.597268], [4.489809, 34.063913], [4.182020, 36.388967], [3.857837, 38.576633], [3.518929, 40.632325], [3.166732, 42.562254], [2.802663, 44.373120], [2.402633, 46.181274], [1.932527, 48.102312], [1.375099, 50.141511], [0.707966, 52.303277], [-0.099229, 54.590572], [-1.088435, 57.004230], [-2.318109, 59.542120], [-3.872912, 62.197818], [-5.879212, 64.958735], [-8.531846, 67.803248], [-12.143100, 70.695663], [-17.233500, 73.576484], [-24.689647, 76.342543], [-35.960125, 78.806124], [-52.813778, 80.628669], [-75.000008, 81.328170], [-97.186328, 80.628704], [-114.039897, 78.806125], [-125.310294, 76.342529], [-132.766367, 73.576458], [-137.856838, 70.695651], [-141.468106, 67.803238], [-144.120684, 64.958717], [-146.127062, 62.197812], [-147.681906, 59.542120], [-148.911560, 57.004227], [-149.900662, 54.590556], [-150.708007, 52.303280], [-151.375098, 50.141509], [-151.932500, 48.102307], [-152.402687, 46.181278], [-152.802723, 44.373125], [-153.166751, 42.562254], [-153.518915, 40.632322], [-153.857821, 38.576630], [-154.181990, 36.388963], [-154.489799, 34.063910], [-154.779590, 31.597266], [-155.049553, 28.986478], [-155.297827, 26.231159], [-155.522655, 23.333627], [-155.722194, 20.299386], [-155.894514, 17.137553], [-156.038093, 13.861142], [-156.151472, 10.487084], [-156.233385, 7.035993], [-156.282880, 3.531620], [-156.299450, 0.000001], [-156.282896, -3.531617], [-156.233351, -7.035990], [-156.151457, -10.487081], [-156.038121, -13.861140], [-155.894494, -17.137550], [-155.722157, -20.299382], [-155.522697, -23.333627], [-155.297838, -26.231158], [-155.049528, -28.986474], [-154.779562, -31.597262], [-154.489829, -34.063911], [-154.182018, -36.388963], [-153.857904, -38.576636], [-153.518932, -40.632322], [-153.166778, -42.562255], [-152.802668, -44.373117]]]
+},
+"bbox": [-156.2994498, -81.32823464, 6.29944497, 81.32817003],
+"properties": {
+  "datetime": "2026-06-21T18:05:08Z",
+  "platform": "goes-19",
+  "constellation": "goes",
+  "instruments": [
+    "abi"
+  ],
+  "processing:software": {
+    "hpsatviews": "1.1.0"
+  },
+  "proj:epsg": 4326,
+  "proj:wkt2": "GEOGCRS[\"WGS 84\",ENSEMBLE[\"World Geodetic System 1984 ensemble\",MEMBER[\"World Geodetic System 1984 (Transit)\"],MEMBER[\"World Geodetic System 1984 (G730)\"],MEMBER[\"World Geodetic System 1984 (G873)\"],MEMBER[\"World Geodetic System 1984 (G1150)\"],MEMBER[\"World Geodetic System 1984 (G1674)\"],MEMBER[\"World Geodetic System 1984 (G1762)\"],MEMBER[\"World Geodetic System 1984 (G2139)\"],MEMBER[\"World Geodetic System 1984 (G2296)\"],ELLIPSOID[\"WGS 84\",6378137,298.257223563,LENGTHUNIT[\"metre\",1]],ENSEMBLEACCURACY[2.0]],PRIMEM[\"Greenwich\",0,ANGLEUNIT[\"degree\",0.0174532925199433]],CS[ellipsoidal,2],AXIS[\"geodetic latitude (Lat)\",north,ORDER[1],ANGLEUNIT[\"degree\",0.0174532925199433]],AXIS[\"geodetic longitude (Lon)\",east,ORDER[2],ANGLEUNIT[\"degree\",0.0174532925199433]],USAGE[SCOPE[\"Horizontal component of 3D system.\"],AREA[\"World.\"],BBOX[-90,-180,90,180]],ID[\"EPSG\",4326]]",
+  "proj:transform": [0.01625665283, 0, -156.2744141, 0, -0.01625447235, 81.2779541],
+  "proj:shape": [10000, 10000],
+  "proj:bbox": [-156.2744141, -81.26676941, 6.292113781, 81.2779541],
+  "hpsv:sector": "fd",
+  "hpsv:command": "gray",
+  "hpsv:channels": [
+    {
+      "name": "C02",
+      "quantity": "reflectance",
+      "min": -0.0405819,
+      "max": 1.25804,
+      "unit": "unitless"
+    }
+  ],
+  "hpsv:enhancements": {
+  }
+},
+"links": [
+],
+"assets": {
+  "image": {
+    "href": "hpsv_G19_fd_2026172_1805_gray_C02.tif",
+    "type": "image/tiff; application=geotiff",
+    "roles": [
+      "data"
+    ],
+    "proj:shape": [21696, 21696],
+    "proj:transform": [501.0043289, 0, -5434895.082, 0, -501.0043289, 5434895.082],
+    "proj:wkt2": "PROJCRS[\"unknown\",BASEGEOGCRS[\"unknown\",DATUM[\"Unknown based on GRS 1980 ellipsoid\",ELLIPSOID[\"GRS 1980\",6378137,298.257222101,LENGTHUNIT[\"metre\",1],ID[\"EPSG\",7019]]],PRIMEM[\"Greenwich\",0,ANGLEUNIT[\"degree\",0.0174532925199433],ID[\"EPSG\",8901]]],CONVERSION[\"unknown\",METHOD[\"Geostationary Satellite (Sweep X)\"],PARAMETER[\"Longitude of natural origin\",-75,ANGLEUNIT[\"degree\",0.0174532925199433],ID[\"EPSG\",8802]],PARAMETER[\"Satellite Height\",35786023,LENGTHUNIT[\"metre\",1,ID[\"EPSG\",9001]]],PARAMETER[\"False easting\",0,LENGTHUNIT[\"metre\",1],ID[\"EPSG\",8806]],PARAMETER[\"False northing\",0,LENGTHUNIT[\"metre\",1],ID[\"EPSG\",8807]]],CS[Cartesian,2],AXIS[\"(E)\",east,ORDER[1],LENGTHUNIT[\"metre\",1,ID[\"EPSG\",9001]]],AXIS[\"(N)\",north,ORDER[2],LENGTHUNIT[\"metre\",1,ID[\"EPSG\",9001]]]]",
+    "eo:bands": [
+      {
+        "name": "C02",
+        "common_name": "red",
+        "center_wavelength": 0.64
+      }
+    ]
+  },
+  "image_geographic": {
+    "href": "hpsv_G19_fd_2026172_1805_gray_C02_geo.tif",
+    "type": "image/tiff; application=geotiff",
+    "roles": [
+      "data"
+    ],
+    "proj:shape": [10000, 10000],
+    "proj:transform": [0.01625665283, 0, -156.2744141, 0, -0.01625447235, 81.2779541],
+    "proj:epsg": 4326,
+    "proj:wkt2": "GEOGCRS[\"WGS 84\",ENSEMBLE[\"World Geodetic System 1984 ensemble\",MEMBER[\"World Geodetic System 1984 (Transit)\"],MEMBER[\"World Geodetic System 1984 (G730)\"],MEMBER[\"World Geodetic System 1984 (G873)\"],MEMBER[\"World Geodetic System 1984 (G1150)\"],MEMBER[\"World Geodetic System 1984 (G1674)\"],MEMBER[\"World Geodetic System 1984 (G1762)\"],MEMBER[\"World Geodetic System 1984 (G2139)\"],MEMBER[\"World Geodetic System 1984 (G2296)\"],ELLIPSOID[\"WGS 84\",6378137,298.257223563,LENGTHUNIT[\"metre\",1]],ENSEMBLEACCURACY[2.0]],PRIMEM[\"Greenwich\",0,ANGLEUNIT[\"degree\",0.0174532925199433]],CS[ellipsoidal,2],AXIS[\"geodetic latitude (Lat)\",north,ORDER[1],ANGLEUNIT[\"degree\",0.0174532925199433]],AXIS[\"geodetic longitude (Lon)\",east,ORDER[2],ANGLEUNIT[\"degree\",0.0174532925199433]],USAGE[SCOPE[\"Horizontal component of 3D system.\"],AREA[\"World.\"],BBOX[-90,-180,90,180]],ID[\"EPSG\",4326]]",
+    "eo:bands": [
+      {
+        "name": "C02",
+        "common_name": "red",
+        "center_wavelength": 0.64
+      }
+    ]
+  }
+}
+}

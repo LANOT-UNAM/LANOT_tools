@@ -42,7 +42,7 @@ sudo /opt/lanot-tools/venv/bin/pip install pytest
 /opt/lanot-tools/venv/bin/python -m pytest tests/
 ```
 
-Expected on a healthy checkout: **224 passed, 0 skipped** (medido el 2026-08-30 con `/opt/lanot-tools/venv` + pytest en un `--target`). El conteo anterior de esta línea —114 passed, 33 skipped— ya no aplica: los saltos eran por datos de muestra ausentes en aquel checkout, no por dependencias.
+Expected on a healthy checkout: **265 passed, 0 skipped** (medido el 2026-09-12 con `/opt/lanot-tools/venv` + pytest en un `--target`, tras la fase 4 de STAC y la regla de tamaños < 1). Conteos anteriores —224 el 2026-08-30; 114 passed, 33 skipped antes— ya no aplican: aquellos saltos eran por datos de muestra ausentes, no por dependencias.
 
 Los tests del Skew-T que compilan un `.mg` se saltan solos si `mg` no está en el PATH; los del lector NUCAPS, si falta `netCDF4`.
 
@@ -65,7 +65,7 @@ The system has three CLI entry points and six importable library modules:
 
 ### Key Design Patterns
 
-**Projection handling** — `GOES_PROJECTIONS` dict maps aliases (`goes16`, `goes18`, etc.) to Proj4 strings. `_resolve_crs()` translates aliases before passing to pyproj. Both tools accept `epsg:XXXX` or raw Proj4 strings via `--crs`.
+**Projection handling** — There are no CRS aliases: `--crs` takes `epsg:XXXX`, a Proj4 string or WKT, passed straight to pyproj/rasterio. The GOES fixed-grid CRS comes from the data — the GeoTIFF via rasterio, or `proj:wkt2` in hpsv's STAC Item — never from a private table. The old `GOES_PROJECTIONS` alias table was deleted in STAC phase 4: it hardcoded `+a/+b/+h/+lon_0` while `hpsv` reads them from the NetCDF, and only worked because two repos kept tables in sync by hand.
 
 **Layer system** — `--layer NAME:COLOR:WIDTH[:labels]` syntax. Predefined names: `COASTLINE`, `COUNTRIES`, `MEXSTATES`, and `gridN` (lat/lon grid at N° intervals). Vector data loaded from `/usr/local/share/lanot/gpkg/` (installed) or local path (dev). Layers are drawn in CLI argument order.
 
@@ -77,11 +77,13 @@ The system has three CLI entry points and six importable library modules:
 
 **Skew-T geometry: the skew lives in the data, not in the renderer** — mg's `yscale="log"` is *not* used. Under a log axis mg remaps coordinate-by-coordinate and matrices don't compose (structs and bare `grid()`/`ticks()`/`axis()` are errors inside), so a shear can't be expressed there. Instead `skewt.py` computes `y = log(p_max/p)` and `x = T + m·y` in Python and uses a **linear** `plot`; `m` is derived from `--skew` and the box aspect so the angle is the one seen on the page. Consequences: pressure gridlines are irregular in `y`, so each isobar is a `rule(y=…, label=…)` rather than a `yaxis(step=…)`; and the pressure axis gets its name from `yaxis(label=…, ticks="none", tick_labels=false)`.
 
-**Metadata JSON sidecar** — For non-GeoTIFF images, pass georeferencing via `--metadata file.json` with keys: `crs`, `bounds` `[minx, miny, maxx, maxy]`, `timestamp`, `satellite`.
+**Metadata JSON = STAC Item** — For non-GeoTIFF images, `mapdrawer --metadata` reads the STAC Item that `hpsv -j` writes (`Metadata.from_stac_item_file()`); the old flat sidecar with `crs`/`bounds` at the root is rejected. Two traps: the root `bbox` is the 4326 *footprint*, not the raster extent — bounds come from the asset's `proj:transform` + `proj:shape`; and with `-B` the Item has two assets on different grids, so the asset is picked by `href` == image basename and the item-level `proj:*` is trusted only when there is a single asset. `Metadata.from_json_file()`/`save_json()` still handle the flat format for `geotiff2view --save-metadata` and the sidecar `mapdrawer --o_crs` writes.
 
 **Optional dependencies** — Both tools degrade gracefully: no `rasterio` → PIL-only reading (no geo-metadata); no `pyproj` → linear projection only.
 
 **Position indices** — Logo, timestamp, legend, colorbar positions use 0=UL, 1=UR, 2=LL, 3=LR throughout all tools.
+
+**Sizes: < 1 is a fraction of the image width** — `calculate_size()` (`mapdrawer.py`, shared by all three tools) reads `--logo-size`, `--font-size`, `--shape` size and the `--layer` width the same way: `0 < v < 1` → fraction of the width, `≥ 1` → pixels, `N%` → percent. So `COASTLINE:white:0.0005` is ~1 px on a meso sector and 5 px on a 10000 px disk, while `:1` is 1 px. The trap is GMT/QGIS habit: `:0.5` means "thin line" there and **half the image** here. `layer_width()` warns on stderr when a relative line width exceeds 1 % of the width. Until 2026-06 (`f50b864`) the layer width was pixels, which is what servers with older code still do.
 
 ### Installed Resource Paths
 - CPT palettes: `/usr/local/share/lanot/colortables/`

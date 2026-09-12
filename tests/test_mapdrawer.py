@@ -7,9 +7,13 @@ Cubre:
 - draw_logo() sin logo en disco no lanza excepción
 - overlay_glm() delega en render_glm_layer() con los parámetros correctos
   y compone la capa sobre self.image
+- CLI --metadata: sólo acepta el Item de STAC de hpsv y falla en voz alta
+- calculate_size / layer_width: < 1 es fracción del ancho, >= 1 píxeles
 """
 
+import json
 import os
+import subprocess
 import sys
 from unittest.mock import MagicMock, patch
 import numpy as np
@@ -17,7 +21,7 @@ import pytest
 from PIL import Image
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from mapdrawer import MapDrawer, make_south_room
+from mapdrawer import MapDrawer, make_south_room, calculate_size, layer_width
 from metadata import Metadata
 
 
@@ -35,9 +39,15 @@ def _rgba_layer(w=200, h=100, color=(255, 255, 0, 128)):
     return Image.new('RGBA', (w, h), color)
 
 
+# Rejilla fija de GOES-18. Literal: la tabla de alias GOES_PROJECTIONS se borró
+# en la fase 4 de STAC y el CRS ya sólo llega de los datos.
+GOES18_PROJ = ('+proj=geos +h=35786023.0 +lon_0=-137.0 +sweep=x '
+               '+a=6378137.0 +b=6356752.31414 +units=m +no_defs')
+
+
 def _meta_with_bounds():
     return Metadata(
-        crs='goes18',
+        crs=GOES18_PROJ,
         bounds=(-3627271.29, 1583174.66, 1382771.93, 4589200.59),
         satellite='GOES-18',
         timestamp='2026:04:28 19:15:00',
@@ -343,3 +353,100 @@ class TestMakeSouthRoom:
         out, out_meta = make_south_room(img, meta, lat_south=-100.0)
         assert out is img
         assert tuple(out_meta['bounds']) == (-120.0, 20.0, -100.0, 40.0)
+
+
+# ---------------------------------------------------------------------------
+# CLI --metadata
+# ---------------------------------------------------------------------------
+
+MAPDRAWER = os.path.join(os.path.dirname(__file__), '..', 'mapdrawer.py')
+
+
+class TestMetadataCli:
+    """Un --metadata ilegible no puede degradar a una imagen sin georreferencia:
+    antes se ignoraba en silencio y el error sólo se veía en lo publicado."""
+
+    def _run(self, tmp_path, meta_path):
+        img = tmp_path / 'img.png'
+        _solid_image().save(img)
+        return subprocess.run(
+            [sys.executable, MAPDRAWER, str(img), '-m', str(meta_path),
+             '-o', str(tmp_path / 'out.png')],
+            capture_output=True, text=True, timeout=120)
+
+    def test_flat_sidecar_exits_1(self, tmp_path):
+        flat = tmp_path / 'flat.json'
+        flat.write_text(json.dumps({'crs': 'goes18', 'bounds': [0, 0, 1, 1]}))
+        r = self._run(tmp_path, flat)
+        assert r.returncode == 1
+        assert 'no es un Item de STAC' in r.stderr
+        assert not (tmp_path / 'out.png').exists()
+
+    def test_missing_metadata_file_exits_1(self, tmp_path):
+        r = self._run(tmp_path, tmp_path / 'no_existe.json')
+        assert r.returncode == 1
+        assert 'no existe' in r.stderr
+        assert not (tmp_path / 'out.png').exists()
+
+
+# ---------------------------------------------------------------------------
+# Tamaños: < 1 es fracción del ancho, >= 1 píxeles
+# ---------------------------------------------------------------------------
+
+class TestCalculateSize:
+    @pytest.mark.parametrize('value, expected', [
+        ('0.0005', 5), ('0.5', 5000), ('1', 1), ('1.0', 1), ('2', 2),
+        ('0.05%', 5), (None, 7), ('abc', 7), ('abc%', 7),
+    ])
+    def test_rule(self, value, expected):
+        assert calculate_size(value, 10000, default=7) == expected
+
+
+class TestLayerWidth:
+    def test_default_is_one_pixel(self, capsys):
+        assert layer_width(None, 1276) == 1
+        assert layer_width('', 1276) == 1
+        assert capsys.readouterr().err == ''
+
+    def test_relative_never_below_one_pixel(self):
+        assert layer_width('0.0005', 500) == 1  # int(0.25) = 0
+
+    def test_relative_scales_with_width(self, capsys):
+        assert layer_width('0.0005', 10000) == 5
+        assert capsys.readouterr().err == ''
+
+    def test_one_is_a_pixel_not_the_whole_image(self, capsys):
+        assert layer_width('1', 1276) == 1
+        assert layer_width('1.0', 1276) == 1
+        assert layer_width('2', 1276) == 2
+        assert capsys.readouterr().err == ''
+
+    @pytest.mark.parametrize('value', ['0.5', '5%'])
+    def test_warns_on_huge_relative_width(self, value, capsys):
+        """El caso de mesoescala: 0.5 pensado como «línea fina» es media imagen."""
+        width = layer_width(value, 1276, name=f'--layer COASTLINE:white:{value}')
+        assert width > 12
+        err = capsys.readouterr().err
+        assert 'Advertencia' in err and 'COASTLINE:white' in err
+
+    def test_same_rule_in_all_tools(self):
+        """geotiff2view y ash_view_generator no pueden volver a leer píxeles
+        por su cuenta: usan las funciones de mapdrawer."""
+        import geotiff2view
+        assert geotiff2view.calculate_size is calculate_size
+        assert geotiff2view.layer_width is layer_width
+        root = os.path.join(os.path.dirname(__file__), '..')
+        # mapdrawer.py sí tiene float(parts[2]), pero es la latitud de --shape;
+        # su grosor de capa lo cubre test_cli_warns_on_half_image_width.
+        for name in ('geotiff2view.py', 'ash_view_generator.py'):
+            with open(os.path.join(root, name)) as f:
+                assert 'float(parts[2])' not in f.read(), name
+
+    def test_cli_warns_on_half_image_width(self, tmp_path):
+        img = tmp_path / 'img.png'
+        _solid_image().save(img)
+        r = subprocess.run(
+            [sys.executable, MAPDRAWER, str(img), '--bounds=-120,40,-80,10',
+             '--layer', 'COASTLINE:white:0.5', '-o', str(tmp_path / 'out.png')],
+            capture_output=True, text=True, timeout=120)
+        assert 'Advertencia' in r.stderr and '0.5' in r.stderr

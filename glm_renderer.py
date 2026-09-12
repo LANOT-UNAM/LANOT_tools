@@ -51,21 +51,6 @@ try:
 except ImportError:
     HAS_RASTERIO = False
 
-# Proyecciones GOES predefinidas (mismas que mapdrawer)
-GOES_PROJECTIONS = {
-    'goes16': '+proj=geos +h=35786023.0 +lon_0=-75.0 +sweep=x +a=6378137.0 +b=6356752.31414 +units=m +no_defs',
-    'goes17': '+proj=geos +h=35786023.0 +lon_0=-137.0 +sweep=x +a=6378137.0 +b=6356752.31414 +units=m +no_defs',
-    'goes18': '+proj=geos +h=35786023.0 +lon_0=-137.0 +sweep=x +a=6378137.0 +b=6356752.31414 +units=m +no_defs',
-    'goes19': '+proj=geos +h=35786023.0 +lon_0=-75.0 +sweep=x +a=6378137.0 +b=6356752.31414 +units=m +no_defs',
-}
-
-
-def _resolve_crs(crs_name):
-    if crs_name is None:
-        return None
-    return GOES_PROJECTIONS.get(crs_name.lower(), crs_name)
-
-
 def render_glm_layer(glm_files, metadata, base_color=(255, 255, 0)):
     """
     Genera una capa RGBA con la densidad de eventos GLM lista para composición.
@@ -86,8 +71,7 @@ def render_glm_layer(glm_files, metadata, base_color=(255, 255, 0)):
         print("Error: pyproj es necesario para render_glm_layer.", file=sys.stderr)
         return None
 
-    # Resolver CRS desde metadata
-    crs_str = _resolve_crs(metadata.get('crs'))
+    crs_str = metadata.get('crs')
     if crs_str is None:
         print("Error: metadata no contiene 'crs'.", file=sys.stderr)
         return None
@@ -487,7 +471,7 @@ def render_glm_grid_layer(files, metadata, product='FED', cpt_obj=None,
               file=sys.stderr)
         return None
 
-    crs_str = _resolve_crs(metadata.get('crs'))
+    crs_str = metadata.get('crs')
     if crs_str is None:
         print("Error: metadata no contiene 'crs'.", file=sys.stderr)
         return None

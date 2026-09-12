@@ -5,6 +5,7 @@ Cubre:
 - Acceso dict-like
 - get_mapdrawer_bounds()
 - from_dict / from_json_file / save_json
+- from_stac_item / from_stac_item_file (Item de STAC de hpsv -j)
 - enrich_from_filename()
 - format_timestamp()
 - format_timestamp_glm()   ← nueva funcionalidad GLM
@@ -109,15 +110,6 @@ class TestSerialization:
     def test_from_json_file_not_found(self):
         with pytest.raises(FileNotFoundError):
             Metadata.from_json_file('/no/existe/meta.json')
-
-    def test_from_json_file_real(self):
-        """Carga el sidecar JSON que ya existe en el repo."""
-        repo_json = os.path.join(os.path.dirname(__file__), 'data', 'hpsv_G18_m1_2026100_1930_output_C13.json')
-        if not os.path.exists(repo_json):
-            pytest.skip("Archivo JSON de ejemplo no encontrado en el repo")
-        m = Metadata.from_json_file(repo_json)
-        # Debe tener al menos alguna clave
-        assert len(list(m.keys())) > 0
 
 
 # ---------------------------------------------------------------------------
@@ -336,3 +328,143 @@ class TestFormatTimestampGlm:
         # Sin datos GLM debe comportarse igual que format_timestamp
         expected = m.format_timestamp(include_satellite=True, include_product=True)
         assert result == expected
+
+
+# ---------------------------------------------------------------------------
+# from_stac_item: el Item de STAC que escribe hpsv -j
+# ---------------------------------------------------------------------------
+
+DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
+# Rejilla fija, un solo activo: hpsv rgb -m ash -s -4 -j (G16 CONUS)
+ITEM_FIXED = os.path.join(DATA_DIR, 'hpsv_G16_conus_2024220_1302_ash.json')
+# -B: activos 'image' (rejilla fija) e 'image_geographic' (EPSG:4326)
+ITEM_BOTH = os.path.join(DATA_DIR, 'hpsv_G16_conus_2024220_1302_gray_C13.json')
+ITEM_BOTH_FD = os.path.join(DATA_DIR, 'hpsv_G19_fd_2026172_1805_gray_C02.json')
+
+
+def _load(path):
+    with open(path) as f:
+        return json.load(f)
+
+
+class TestFromStacItem:
+    def test_fixed_grid_single_asset(self):
+        item = _load(ITEM_FIXED)
+        m = Metadata.from_stac_item_file(ITEM_FIXED, image_path='rgb_json_out.png')
+        assert m['crs'] == item['assets']['image']['proj:wkt2']
+        # Rejilla fija: metros, lo mismo que proj:bbox del Item
+        assert m['bounds'] == pytest.approx(item['properties']['proj:bbox'], abs=1e-3)
+        assert m['timestamp'] == '2024-08-07T13:02:36Z'
+        assert m['satellite'] == 'G16'
+        assert m['product'] == 'Volcanic Ash'
+
+    def test_bounds_are_not_root_bbox(self):
+        """El bbox de la raíz es la huella en 4326, no la extensión del ráster."""
+        item = _load(ITEM_FIXED)
+        m = Metadata.from_stac_item(item)
+        assert abs(m['bounds'][0]) > 360
+        assert abs(item['bbox'][0]) <= 180
+
+    def test_single_asset_does_not_require_matching_name(self):
+        m = Metadata.from_stac_item_file(ITEM_FIXED, image_path='/otro/dir/renombrada.png')
+        assert 'bounds' in m and 'crs' in m
+
+    def test_timestamp_formats_for_display(self):
+        m = Metadata.from_stac_item_file(ITEM_FIXED)
+        assert m.format_timestamp() == 'G16 2024/08/07 13:02Z'
+
+    @pytest.mark.parametrize('path', [ITEM_BOTH, ITEM_BOTH_FD])
+    def test_B_picks_geographic_asset_by_href(self, path):
+        item = _load(path)
+        asset = item['assets']['image_geographic']
+        m = Metadata.from_stac_item(
+            item, image_path=os.path.join('/cualquier/dir', asset['href']))
+        # hpsv declara proj:wkt2 (WGS 84) además de proj:epsg; vale cualquiera
+        # de las dos formas mientras sea 4326.
+        from pyproj import CRS
+        assert CRS.from_user_input(m['crs']).to_epsg() == 4326
+        a, _, c, _, e, f = asset['proj:transform']
+        h, w = asset['proj:shape']
+        assert m['bounds'] == pytest.approx((c, f + e * h, c + a * w, f))
+
+    @pytest.mark.parametrize('path', [ITEM_BOTH, ITEM_BOTH_FD])
+    def test_B_fixed_asset_uses_its_own_wkt2(self, path):
+        """Con -B cada activo trae su CRS. El del activo fijo es la rejilla del
+        satélite en metros, no el 4326 que describe el proj:* del Item."""
+        item = _load(path)
+        asset = item['assets']['image']
+        m = Metadata.from_stac_item(item, image_path=asset['href'])
+        assert m['crs'] == asset['proj:wkt2']
+        assert m['crs'] != item['properties']['proj:wkt2']
+        a, _, c, _, e, f = asset['proj:transform']
+        h, w = asset['proj:shape']
+        assert m['bounds'] == pytest.approx((c, f + e * h, c + a * w, f))
+        assert abs(m['bounds'][0]) > 360
+
+    def test_asset_without_crs_does_not_borrow_the_items(self):
+        """Con varios activos, uno sin CRS propio no toma el del Item: ese
+        proj:* describe a otro activo. Así salía hpsv -B hasta el 2026-09-12."""
+        item = _load(ITEM_BOTH)
+        del item['assets']['image']['proj:wkt2']
+        with pytest.raises(ValueError, match="no declara CRS"):
+            Metadata.from_stac_item(item, image_path=item['assets']['image']['href'])
+
+    def test_single_asset_falls_back_to_item_crs(self):
+        """Con un solo activo no hay ambigüedad: vale el CRS del Item."""
+        item = _load(ITEM_FIXED)
+        del item['assets']['image']['proj:wkt2']
+        m = Metadata.from_stac_item(item)
+        assert m['crs'] == item['properties']['proj:wkt2']
+
+    def test_B_without_matching_image_fails(self):
+        item = _load(ITEM_BOTH)
+        with pytest.raises(ValueError, match="varios activos"):
+            Metadata.from_stac_item(item, image_path='otra.png')
+        with pytest.raises(ValueError, match="varios activos"):
+            Metadata.from_stac_item(item)
+
+    def test_rejects_flat_sidecar(self):
+        flat = {'tool': 'hpsatviews', 'crs': 'goes18',
+                'bounds': [881767.62, 3306628.5, 1883776.2, 4308637]}
+        with pytest.raises(ValueError, match="no es un Item de STAC"):
+            Metadata.from_stac_item(flat)
+
+    def test_rotated_grid_fails(self):
+        item = _load(ITEM_FIXED)
+        item['assets']['image']['proj:transform'][1] = 0.5
+        with pytest.raises(ValueError, match="rotada"):
+            Metadata.from_stac_item(item)
+
+    def test_missing_grid_fails(self):
+        item = _load(ITEM_FIXED)
+        del item['assets']['image']['proj:transform']
+        del item['properties']['proj:transform']
+        with pytest.raises(ValueError, match="proj:transform"):
+            Metadata.from_stac_item(item)
+
+    @pytest.mark.parametrize('platform, expected', [
+        ('goes-19', 'G19'), ('GOES-18', 'G18'), ('noaa-21', 'NOAA-21'),
+    ])
+    def test_platform_short_name(self, platform, expected):
+        """G19 y no GOES-19: la convención de CIMSS/CIRA y de los nombres."""
+        item = _load(ITEM_FIXED)
+        item['properties']['platform'] = platform
+        assert Metadata.from_stac_item(item)['satellite'] == expected
+
+    def test_file_not_found(self):
+        with pytest.raises(FileNotFoundError):
+            Metadata.from_stac_item_file('/no/existe/item.json')
+
+    def test_wkt2_matches_deleted_goes16_alias(self):
+        """El CRS que trae el Item y la tabla GOES_PROJECTIONS['goes16'] que se
+        borró en la fase 4 ponen los mismos puntos en el mismo sitio."""
+        from pyproj import Transformer
+        old = ('+proj=geos +h=35786023.0 +lon_0=-75.0 +sweep=x '
+               '+a=6378137.0 +b=6356752.31414 +units=m +no_defs')
+        new = Metadata.from_stac_item_file(ITEM_FIXED)['crs']
+        t_old = Transformer.from_crs('epsg:4326', old, always_xy=True)
+        t_new = Transformer.from_crs('epsg:4326', new, always_xy=True)
+        for lon, lat in [(-99.1, 19.4), (-120.0, 45.0), (-75.0, 0.0), (-60.0, -30.0)]:
+            xo, yo = t_old.transform(lon, lat)
+            xn, yn = t_new.transform(lon, lat)
+            assert abs(xo - xn) < 1.0 and abs(yo - yn) < 1.0
