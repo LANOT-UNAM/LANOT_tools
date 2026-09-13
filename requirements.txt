@@ -5,4 +5,5 @@ numpy
 scipy
 netCDF4
 rasterio
-
+h5netcdf
+s3fs
