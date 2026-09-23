@@ -213,3 +213,20 @@ def test_identifica_satelite_y_sensor(granulo):
     assert s.satellite == 'NOAA-20'          # del j01 del nombre, vía Metadata
     assert s.sensor == 'CrIS+ATMS'
     assert s.timestamp is not None and s.timestamp.year == 2026
+
+
+# HEAP nombra a NOAA-21 'n21', no 'j02' como los SDR. Del nombre salía "NOAA" a
+# secas en el subtítulo del Skew-T; el archivo lo dice en su atributo `platform`.
+
+def test_el_satelite_sale_del_atributo_platform(tmp_path, perfil):
+    path = escribe_granulo(tmp_path / 'NUCAPS-EDR_v3r2_n21_s202609221909449_e_c.nc',
+                           perfil, lats=[19.47], lons=[-98.72], quality=[0])
+    with netCDF4.Dataset(path, 'a') as ds:
+        ds.platform = 'NOAA-21'
+    assert ns.read_sounding([path], 19.5, -98.7).satellite == 'NOAA-21'
+
+
+def test_sin_atributo_el_n21_del_nombre_basta(tmp_path, perfil):
+    path = escribe_granulo(tmp_path / 'NUCAPS-EDR_v3r2_n21_s202609221909449_e_c.nc',
+                           perfil, lats=[19.47], lons=[-98.72], quality=[0])
+    assert ns.read_sounding([path], 19.5, -98.7).satellite == 'NOAA-21'

@@ -144,10 +144,15 @@ Al 2026-08-30, en orden de lo que bloquea a lo que no:
   equivalente de `crea_vistas_viirs.sh` o `GLMconus_png.sh`, y para eso hace falta
   antes **la lista de sitios fijos**, que es lo que quedó apuntado al final de
   `plan_cape_lifted_index.md`.
-- **El logo** (`logos/lanot_logo.mg`): queda para una discusión aparte. Hoy es una
-  figura suelta con su propio `display_size`/`world_window`, así que para ponerlo
-  en el diagrama habría que envolverlo en un `struct` —como ya lo está
-  `lanot_sat.mg`— y decidir cómo resuelve su `include` fuera de su directorio.
+- ~~**El logo**~~ — hecho el 2026-09-22. El dibujo vive en la struct
+  `LanotLogo(size=…)` de `logos/lanot_logo_struct.mg`, que `lanot_logo.mg` usa (su
+  SVG salió byte por byte igual). No se coloca con `fit` porque el texto va en pt y
+  no se escala con la caja: toda la geometría sale de `size`. `skewt` **incrusta**
+  las tres definiciones en el `.mg` que emite —el `.mg` se compila junto a la
+  salida, donde `include` no las encontraría— y pone el logo a la izquierda del
+  título, como `--logo-pos 0` en las vistas de la cadena. `--no-logo` lo quita; si
+  no encuentra los `.mg` (`LANOT_LOGOS_MG`, `logos/` junto al módulo,
+  `/opt/lanot-tools/src/logos`), avisa y sale sin logo.
 
 ## Cómo se verifica
 

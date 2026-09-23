@@ -320,9 +320,9 @@ class Metadata:
 
         Satellite tokens (prefix or substring):
             npp            → Suomi NPP
-            noaa20 / j01   → NOAA-20
-            noaa21 / j02   → NOAA-21
-            noaa22 / j03   → NOAA-22
+            noaa20 / j01 / n20   → NOAA-20  (nNN: como nombra HEAP sus NUCAPS)
+            noaa21 / j02 / n21   → NOAA-21
+            noaa22 / j03 / n22   → NOAA-22
             metopc         → Metop-C
             metopb         → Metop-B
             metopa         → Metop-A
@@ -394,11 +394,11 @@ class Metadata:
         if 'satellite' not in self:
             if lower.startswith('npp') or '_npp_' in lower:
                 self['satellite'] = 'Suomi NPP'
-            elif 'noaa20' in lower or re.search(r'(?:^|[_.-])j01(?:[_.-]|$)', lower):
+            elif 'noaa20' in lower or re.search(r'(?:^|[_.-])(?:j01|n20)(?:[_.-]|$)', lower):
                 self['satellite'] = 'NOAA-20'
-            elif 'noaa21' in lower or re.search(r'(?:^|[_.-])j02(?:[_.-]|$)', lower):
+            elif 'noaa21' in lower or re.search(r'(?:^|[_.-])(?:j02|n21)(?:[_.-]|$)', lower):
                 self['satellite'] = 'NOAA-21'
-            elif 'noaa22' in lower or re.search(r'(?:^|[_.-])j03(?:[_.-]|$)', lower):
+            elif 'noaa22' in lower or re.search(r'(?:^|[_.-])(?:j03|n22)(?:[_.-]|$)', lower):
                 self['satellite'] = 'NOAA-22'
             elif 'metopc' in lower:
                 self['satellite'] = 'Metop-C'

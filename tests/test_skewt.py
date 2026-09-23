@@ -224,6 +224,46 @@ def test_el_mg_emitido_compila(diag, tmp_path, ext):
     assert 'Error' not in r.stderr, r.stderr
 
 
+# --- logo -------------------------------------------------------------------
+
+def test_encuentra_los_mg_del_logo():
+    d = skewt.find_logo_dir()
+    assert d is not None
+    for f in skewt.LOGO_FILES:
+        assert os.path.isfile(os.path.join(d, f))
+
+
+def test_el_logo_va_incrustado_sin_include(diag):
+    src = diag.render(_sondeo_sintetico(), "Prueba",
+                      skewt.logo_source(skewt.find_logo_dir()))
+    # Autocontenido: el .mg se compila lejos de logos/, donde include no llega.
+    assert not any(l.lstrip().startswith('include ') for l in src.splitlines())
+    assert 'struct LanotLogo' in src and 'struct LanotSat' in src
+    assert 'struct FullDiskMap' in src
+    assert f'LanotLogo(size={skewt.LOGO_SIZE}' in src
+    # Al final: la struct cambia la fuente a sans y no debe alcanzar al título.
+    assert src.rindex('LanotLogo(size=') > src.rindex('text(')
+
+
+def test_sin_logo_no_hay_rastro_de_el(diag):
+    src = diag.render(_sondeo_sintetico(), "Prueba")
+    assert 'LanotLogo' not in src
+
+
+@pytest.mark.skipif(shutil.which(skewt.MG_BIN) is None,
+                    reason="mg no está en el PATH")
+def test_el_mg_con_logo_compila(diag, tmp_path):
+    mg_file = tmp_path / "d.mg"
+    mg_file.write_text(diag.render(_sondeo_sintetico(), "Prueba",
+                                   skewt.logo_source(skewt.find_logo_dir())))
+    out = tmp_path / "d.svg"
+    r = subprocess.run([shutil.which(skewt.MG_BIN), str(mg_file), str(out)],
+                       capture_output=True, text=True, cwd=tmp_path)
+    assert r.returncode == 0, r.stderr
+    assert 'Warning' not in r.stderr and 'Error' not in r.stderr, r.stderr
+    assert '>LAN<' in out.read_text()
+
+
 # --- CLI --------------------------------------------------------------------
 
 def test_size_se_parsea():

@@ -31,6 +31,13 @@ import thermo
 MG_BIN = os.environ.get('MG_BIN', 'mg')
 FORMATS = ('.svg', '.pdf', '.eps')
 
+# El logo del LANOT, en vectorial: las tres definiciones de logos/ que forman la
+# struct LanotLogo, en el orden en que se necesitan. Se INCRUSTAN en el .mg
+# generado en vez de incluirse, para que el fuente siga compilando solo, lejos de
+# logos/ —el .mg se escribe junto a la salida, y ahí `include` no los encuentra—.
+LOGO_FILES = ('fulldisk_logo.mg', 'lanot_sat.mg', 'lanot_logo_struct.mg')
+LOGO_SIZE = 18              # pt: cuerpo de «LAN», un poco mayor que el título
+
 # Isolíneas del fondo. Los pasos son los de un Skew-T de servicio; el rango de las
 # adiabáticas va mucho más allá de la ventana a propósito, porque con el sesgo una
 # curva que nace fuera de la caja entra en ella más arriba.
@@ -252,6 +259,24 @@ class SkewT:
         out.append(f'text("{site}   —   {quality}", align="center") '
                    f'{{ {_fmt(cx)} {_fmt(self.height - 1.70)} }}')
 
+    def _logo(self, out, source):
+        """El logo del LANOT a la izquierda del título, a su altura.
+
+        A la izquierda porque es donde lo ponen las vistas de la cadena
+        (--logo-pos 0) y porque arriba a la derecha, dentro del marco, ya está la
+        tabla de CAPE y LI. Va AL FINAL del fuente: la struct cambia la fuente a
+        sans, y así no alcanza a ningún texto del diagrama.
+
+        Alineado por el centro de las mayúsculas: el de «LAN» coincide con el del
+        título, que va en font_size + 3.
+        """
+        cap_cm = 0.717 / 72 * 2.54
+        y_title = self.height - 0.7
+        y = y_title + cap_cm * ((self.font_size + 3) - LOGO_SIZE) / 2
+        out.append("\n  % logo del LANOT (definiciones incrustadas de logos/)")
+        out.append(source)
+        out.append(f"LanotLogo(size={LOGO_SIZE}, at=({_fmt(0.5)}, {_fmt(y)}))")
+
     def _legend(self, out):
         """Qué es cada curva.
 
@@ -293,8 +318,12 @@ class SkewT:
         out.extend(rows)
         out.append('  }')
 
-    def render(self, snd, title="Skew-T Log-P"):
-        """Devuelve el fuente `.mg` completo del diagrama."""
+    def render(self, snd, title="Skew-T Log-P", logo=None):
+        """Devuelve el fuente `.mg` completo del diagrama.
+
+        `logo` es el fuente de la struct LanotLogo (ver `logo_source`); sin él la
+        figura sale igual, sin logo.
+        """
         bx0, by0, bx1, by1 = self.box
         out = [
             "% Termodiagrama Skew-T Log-P — generado por skewt.py, no editar a mano",
@@ -331,7 +360,34 @@ class SkewT:
         self._table(out, snd)
         out.append("}")
         self._header(out, snd, title)
+        if logo:
+            self._logo(out, logo)
         return "\n".join(out) + "\n"
+
+
+def find_logo_dir():
+    """El directorio con los .mg del logo, o None.
+
+    En desarrollo están junto a este archivo; instalado, pip deja el módulo en el
+    venv y los fuentes en /opt/lanot-tools/src (install.sh copia el repo entero).
+    LANOT_LOGOS_MG manda sobre todo.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    for d in (os.environ.get('LANOT_LOGOS_MG'), os.path.join(here, 'logos'),
+              '/opt/lanot-tools/src/logos', '/usr/local/share/lanot/logos'):
+        if d and all(os.path.isfile(os.path.join(d, f)) for f in LOGO_FILES):
+            return d
+    return None
+
+
+def logo_source(logo_dir):
+    """Las definiciones del logo, seguidas y sin sus `include`: ya van todas."""
+    parts = []
+    for name in LOGO_FILES:
+        with open(os.path.join(logo_dir, name), encoding="utf-8") as fh:
+            parts.append(f"% --- {name} ---\n" +
+                         "".join(l for l in fh if not l.lstrip().startswith("include ")))
+    return "\n".join(parts)
 
 
 def compile_mg(mg_path, out_path, verbose=False):
@@ -389,6 +445,8 @@ def main():
                     help="conserva el .mg intermedio junto a la salida")
     ap.add_argument("--quality-any", action="store_true",
                     help="dibuja aunque el retrieval esté rechazado")
+    ap.add_argument("--no-logo", action="store_true",
+                    help="sin el logo del LANOT junto al título")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
 
@@ -418,9 +476,18 @@ def main():
     diagram = SkewT(args.temp_min, args.temp_max, args.pres_min, args.pres_max,
                     args.size[0], args.size[1], args.skew)
 
+    logo = None
+    if not args.no_logo:
+        logo_dir = find_logo_dir()
+        if logo_dir is None:
+            print(f"[skewt] AVISO: no encuentro {', '.join(LOGO_FILES)} "
+                  f"(LANOT_LOGOS_MG); la figura sale sin logo.", file=sys.stderr)
+        else:
+            logo = logo_source(logo_dir)
+
     mg_path = os.path.splitext(args.output)[0] + ".mg"
     with open(mg_path, "w") as fh:
-        fh.write(diagram.render(snd, title))
+        fh.write(diagram.render(snd, title, logo))
     if args.verbose:
         print(f"[skewt] fuente: {mg_path}", file=sys.stderr)
 

@@ -195,6 +195,12 @@ class TestEnrichFromFilename:
         assert m.get('product') == 'Temp 500 hPa'
         assert m.get('units') == 'K'
 
+    def test_nucaps_edr_de_heap_n21(self):
+        # HEAP nombra 'n21' a NOAA-21 (los SDR dicen 'j02').
+        m = Metadata()
+        m.enrich_from_filename('NUCAPS-EDR_v3r2_n21_s202609221909449_e202609221910147_c202609221942500.nc')
+        assert m.get('satellite') == 'NOAA-21'
+
     def test_nucaps_skin_temperature(self):
         m = Metadata()
         m.enrich_from_filename(

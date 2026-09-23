@@ -162,6 +162,9 @@ def read_sounding(paths, lat=None, lon=None, max_dist_km=100.0,
         for_lon = float(_to_nan(ds.variables['Longitude'][i]))
         stability = _to_nan(ds.variables['Stability'][i])
         t_msec = float(_to_nan(ds.variables['Time'][i]))
+        # El satélite, del propio archivo: HEAP nombra 'n21' a NOAA-21, que no es
+        # el código de los SDR ('j02'), y del nombre salía solo "NOAA".
+        platform = getattr(ds, 'platform', None)
 
     # Niveles utilizables. En estos archivos los que están bajo la superficie ya
     # vienen como _FillValue, pero el filtro se queda: el mismo lector tiene que
@@ -194,7 +197,7 @@ def read_sounding(paths, lat=None, lon=None, max_dist_km=100.0,
         cape=float(cape), lifted_index=float(li),
         quality=quality, quality_label=quality_label,
         timestamp=timestamp,
-        satellite=meta.get('satellite', 'NOAA'),
+        satellite=platform or meta.get('satellite', 'NOAA'),
         sensor='CrIS+ATMS',       # todo NUCAPS-EDR lo es; no va en el nombre
         source_file=path, for_index=i,
         n_files=len(paths),

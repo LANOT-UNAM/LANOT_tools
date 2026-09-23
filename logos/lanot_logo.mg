@@ -21,8 +21,7 @@
 % base—, la altura de mayúscula sale del cuerpo de la letra (0.717 em en Helvetica),
 % y el LIENZO sale de lo dibujado. Cambiar `size` reacomoda todo junto.
 
-include "fulldisk_logo.mg"
-include "lanot_sat.mg"
+include "lanot_logo_struct.mg"
 
 size = 60                       % cuerpo de la palabra, en pt
 cap  = 0.717*size/72*2.54       % altura de mayúscula, en cm (= unidades de mundo)
@@ -52,9 +51,7 @@ if 0 < gy - gr   { y0 = -m }
 display_size (x1-x0) (y1-y0)
 world_window x0 x1 y0 y1
 
-font "sanserif"
-text("LAN", size=size) { (-lsb) 0 }
-
-FullDiskMap(scale=0.8, at=(gx, gy))
-
-fit(LanotSat) { sx sy  (sx+sw) (sy+sh) }
+% El dibujo vive en la struct (lanot_logo_struct.mg), que otras figuras incluyen;
+% aquí solo se le da lienzo. Las medidas de arriba sirven para calcularlo y tienen
+% que coincidir con las de la struct a size = 60.
+LanotLogo(size=size)
