@@ -1,0 +1,31 @@
+# omps_toz.cpt
+# Columna total de ozono, V8TOz de CSPP OMPS EDR (Nadir Mapper).
+# Rango fijo y no percentiles, como los sondeos: el ozono total tiene un
+# rango climatologico estable y la paleta fija es lo que permite comparar dos
+# pasadas. Sobre Mexico, en agosto-septiembre de 2026, nueve pasadas de los
+# tres satelites dieron 242-332 DU (p0.1-p99.9: 250-321); el techo va a 380
+# porque en invierno y primavera las latitudes medias pasan de 350. Abajo, 220
+# deja fuera solo el agujero de ozono, que no cae en nuestra cobertura.
+# Pasos de 10 DU, rampa violeta (poco ozono) a guinda (mucho).
+# UNIT = DU
+# COLOR_MODEL = RGB
+# Value R G B   Value R G B
+220   90   0 140    230   90   0 140
+230   68  18 176    240   68  18 176
+240   46  36 211    250   46  36 211
+250   27  80 227    260   27  80 227
+260    9 133 236    270    9 133 236
+270    0 169 213    280    0 169 213
+280    0 187 160    290    0 187 160
+290   22 203 111    300   22 203 111
+300  111 217  76    310  111 217  76
+310  200 230  40    320  200 230  40
+320  231 213  18    330  231 213  18
+330  254 190   0    340  254 190   0
+340  249 138   0    350  249 138   0
+350  234  89   2    360  234  89   2
+360  192  44  11    370  192  44  11
+370  150   0  20    380  150   0  20
+B     0   0   0
+F   255 255 255
+N     0   0   0

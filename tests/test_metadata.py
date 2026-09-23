@@ -216,6 +216,17 @@ class TestEnrichFromFilename:
             'noaa21_atms-cris_Temperature_110mb_20260630_184728_wgs84_geo_5km.tif')
         assert m.get('product') == 'Temperature'
 
+    # --- Ozono total de OMPS (V8TOz de CSPP), GeoTIFF de omps_a_geotiff.py.
+
+    def test_omps_ozono_total(self):
+        m = Metadata()
+        m.enrich_from_filename(
+            'noaa20_omps_ColumnAmountO3_20260922_200245_wgs84_geo_5km.tif')
+        assert m.get('satellite') == 'NOAA-20'
+        assert m.get('sensor') == 'OMPS'
+        assert m.get('product') == 'Total Ozone'
+        assert m.get('units') == 'DU'
+
     def test_generico_no_le_gana_a_los_de_nube(self):
         """El respaldo va al final de product_map a proposito."""
         m = Metadata()

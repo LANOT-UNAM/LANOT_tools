@@ -334,6 +334,7 @@ class Metadata:
             abi   → ABI
             mhs   → MHS
             amsu  → AMSU-A
+            omps  → OMPS
 
         Timestamp patterns (in order of priority):
             YYYYMMDD_HHMMSS  (e.g. 20260325_195149)
@@ -431,6 +432,8 @@ class Metadata:
                 self['sensor'] = 'CrIS'
             elif 'atms' in lower:
                 self['sensor'] = 'ATMS'
+            elif 'omps' in lower:
+                self['sensor'] = 'OMPS'
 
         # --- band ---
         if 'band' not in self:
@@ -481,6 +484,10 @@ class Metadata:
                 ('temperature_707mb', 'Temp 700 hPa',        'K'),
                 ('temperature_497mb', 'Temp 500 hPa',        'K'),
                 ('surface_pressure',  'Surface Pressure',    'mb'),
+                # Ozono total de OMPS (V8TOz de CSPP). El GeoTIFF lo escribe
+                # omps_a_geotiff.py de la cadena polar con el nombre de la
+                # variable del NetCDF, como haria Polar2Grid.
+                ('columnamounto3',   'Total Ozone',          'DU'),
                 ('topography',        'Topography',          'm'),
                 ('flood',            'Flood',                None),
                 ('water',            'Flood',                None),
