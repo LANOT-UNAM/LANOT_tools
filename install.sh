@@ -30,6 +30,7 @@ BIN_WRAPPER_SKT="/usr/local/bin/skewt"
 SHARE_DIR="/usr/local/share/lanot"
 CPT_DIR="${SHARE_DIR}/colortables"
 LOGO_DIR="${SHARE_DIR}/logos"
+DOCS_DIR="${SHARE_DIR}/docs"
 
 # Directorio del script (donde está el código fuente)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -71,6 +72,17 @@ if ls "${SCRIPT_DIR}/colortables/"*.cpt >/dev/null 2>&1; then
     echo "  ✓ Tablas de color (.cpt) copiadas desde colortables/ a ${CPT_DIR}"
 else
     echo "  - No se encontraron archivos .cpt en colortables/, omitiendo copia."
+fi
+
+# Recortes geograficos (clave -> ULX,ULY,LRX,LRY). Lo leen mapdrawer y hpsv
+# (hpsatviews/include/clip_loader.h), los dos con esta ruta escrita en el
+# codigo. Antes vivia solo a mano en cada servidor y se desvio: el
+# 2026-09-23 kawak no tenia `ash` y A6 traia la misma latitud arriba y abajo.
+# Se sobrescribe: el repo es la fuente, no se edita en el servidor.
+mkdir -p "${DOCS_DIR}"
+if [ -f "${SCRIPT_DIR}/recortes/recortes_coordenadas.csv" ]; then
+    cp "${SCRIPT_DIR}/recortes/recortes_coordenadas.csv" "${DOCS_DIR}/"
+    echo "  ✓ Recortes (recortes_coordenadas.csv) copiados a ${DOCS_DIR}"
 fi
 
 # Logos: SOLO la salida vectorial (.svg y .pdf). Los `.mg` son el FUENTE y se

@@ -310,6 +310,18 @@ if glm_layer:
 | `viirs_confidence_cat.cpt` | Confianza de detección de fuego (VIIRS) | Categorías discretas |
 | `rainbow.cpt` | Gradiente de propósito general | 0.0–1.0, normalizado |
 
+## Recortes geográficos
+
+`recortes/recortes_coordenadas.csv` define los recortes con nombre que aceptan
+`mapdrawer --clip <clave>` y `hpsv -c <clave>`: `clave,region,ul_x,ul_y,lr_x,lr_y`
+en grados. `install.sh` lo copia a `/usr/local/share/lanot/docs/`, ruta que los
+dos programas tienen escrita en el código. El repo es la fuente: un cambio hecho
+a mano en un servidor se pierde en la siguiente instalación.
+
+`tests/test_recortes.py` revisa que cada caja tenga `ul_x < lr_x` y
+`ul_y > lr_y`, claves únicas en minúsculas y líneas de menos de 256 bytes (el
+búfer de `clip_loader.c` en hpsv).
+
 ## Requisitos
 
 - Python >= 3.8
@@ -324,6 +336,7 @@ Después de la instalación se crean:
 - Paletas CPT: `/usr/local/share/lanot/colortables/`
 - Capas vectoriales: `/usr/local/share/lanot/gpkg/`
 - Logos: `/usr/local/share/lanot/logos/`
+- Recortes: `/usr/local/share/lanot/docs/recortes_coordenadas.csv`
 
 ## Scripts de operación
 
@@ -349,6 +362,7 @@ LANOT_tools/
 ├── GLMconus_png.sh          # Pipeline GLM CONUS (ABI C13 + rayos)
 ├── crea_vistas_viirs.sh     # Procesamiento por lote de productos VIIRS
 ├── *.cpt                    # Paletas de color incluidas
+├── recortes/                # recortes_coordenadas.csv (claves para --clip / hpsv -c)
 ├── setup.py                 # Configuración pip
 ├── install.sh / uninstall.sh
 └── README.md

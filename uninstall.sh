@@ -67,6 +67,9 @@ if [ -d "${LOGO_DIR}" ]; then
     rmdir "${LOGO_DIR}" 2>/dev/null && echo -e "${GREEN}✓ Eliminado: ${LOGO_DIR} (quedó vacío)${NC}"
 fi
 
+# recortes_coordenadas.csv se queda en /usr/local/share/lanot/docs: hpsv
+# tambien lo lee y desinstalar LANOT_tools no debe dejarlo sin recortes.
+
 # Eliminar directorio de instalación
 if [ -d "${INSTALL_DIR}" ]; then
     rm -rf "${INSTALL_DIR}"
