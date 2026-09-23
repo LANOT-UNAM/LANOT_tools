@@ -38,6 +38,12 @@ FORMATS = ('.svg', '.pdf', '.eps')
 LOGO_FILES = ('fulldisk_logo.mg', 'lanot_sat.mg', 'lanot_logo_struct.mg')
 LOGO_SIZE = 18              # pt: cuerpo de «LAN», un poco mayor que el título
 
+# "No hay sondeo que dibujar": el punto quedó fuera de la franja de la pasada o
+# NUCAPS rechazó el perfil. No es un fallo —en cada pasada pasa en la mitad de los
+# sitios— y quien lo invoca en lote tiene que poder distinguirlo de uno. El mismo
+# 3 que usa geotiff2view para "sin datos válidos".
+SIN_SONDEO = 3
+
 # Isolíneas del fondo. Los pasos son los de un Skew-T de servicio; el rango de las
 # adiabáticas va mucho más allá de la ventana a propósito, porque con el sesgo una
 # curva que nace fuera de la caja entra en ella más arriba.
@@ -460,7 +466,14 @@ def _size(text):
 def main():
     ap = argparse.ArgumentParser(
         description="Termodiagrama Skew-T Log-P de un sondeo NUCAPS.",
-        epilog="El formato de salida lo elige la extensión de -o: .svg, .pdf o .eps.")
+        epilog="El formato de salida lo elige la extensión de -o: .svg, .pdf o .eps. "
+               f"Códigos de salida: 0 figura generada; {SIN_SONDEO} sin sondeo "
+               "que dibujar —el punto cae fuera de la pasada o NUCAPS rechazó el "
+               "perfil— y no se escribió nada (no es un fallo); 1 error; 2 error "
+               "de uso.",
+        # Sin reflujo: la tabla de códigos se busca con grep (el %test de la imagen
+        # de la cadena), y partida por el ancho de la terminal no se encontraría.
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("files", nargs='+', metavar="ARCHIVO.nc",
                     help="gránulos NUCAPS-EDR; se busca el FOR más cercano en todos")
     ap.add_argument("-o", "--output", required=True, metavar="SALIDA",
@@ -499,7 +512,10 @@ def main():
             max_dist_km=args.max_dist,
             require_accepted=not args.quality_any,
             verbose=args.verbose)
-    except (ValueError, ImportError) as e:
+    except ValueError as e:
+        print(f"[skewt] {e}", file=sys.stderr)
+        return SIN_SONDEO
+    except ImportError as e:
         print(f"[skewt] {e}", file=sys.stderr)
         return 1
 

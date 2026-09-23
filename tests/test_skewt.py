@@ -283,6 +283,20 @@ def test_el_mg_con_logo_compila(diag, tmp_path):
 
 # --- CLI --------------------------------------------------------------------
 
+def test_sin_sondeo_sale_con_3_no_con_1(tmp_path, monkeypatch):
+    # Fuera de la franja o rechazado es lo normal en la mitad de los sitios de
+    # cada pasada; en lote tiene que distinguirse de un fallo.
+    import nucaps_sounding
+
+    def lejos(*a, **k):
+        raise ValueError("el FOR más cercano queda a 600 km")
+    monkeypatch.setattr(nucaps_sounding, "read_sounding", lejos)
+    monkeypatch.setattr(sys, "argv", ["skewt", "x.nc", "--lat", "19", "--lon", "-99",
+                                      "-o", str(tmp_path / "s.svg")])
+    assert skewt.main() == skewt.SIN_SONDEO == 3
+    assert not (tmp_path / "s.svg").exists()
+
+
 def test_size_se_parsea():
     assert skewt._size("16x20") == (16.0, 20.0)
 
