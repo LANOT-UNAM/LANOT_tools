@@ -224,6 +224,23 @@ def test_el_mg_emitido_compila(diag, tmp_path, ext):
     assert 'Error' not in r.stderr, r.stderr
 
 
+# --- superficie ---------------------------------------------------------------
+
+def test_la_superficie_se_marca_aparte(diag):
+    snd = _sondeo_sintetico()
+    snd.surface_pressure, snd.surface_T, snd.surface_Td = 800.0, 295.0, 280.0
+    src = diag.render(snd, "Prueba")
+    assert 'label="Sup. 800"' in src
+    assert src.count('marker(3, shape="circle"') == 2
+    assert 'Superficie (puntos: T, Td)' in src
+
+
+def test_sin_nivel_de_superficie_no_hay_puntos(diag):
+    src = diag.render(_sondeo_sintetico(), "Prueba")
+    assert 'marker(3, shape="circle"' not in src
+    assert 'Superficie (puntos' not in src
+
+
 # --- logo -------------------------------------------------------------------
 
 def test_encuentra_los_mg_del_logo():

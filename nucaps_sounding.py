@@ -177,6 +177,18 @@ def read_sounding(paths, lat=None, lon=None, max_dist_km=100.0,
     order = np.argsort(-p)                      # de la superficie hacia arriba
     p, T, w = p[order], T[order], w[order]
 
+    # El nivel de SUPERFICIE va aparte. NUCAPS cierra el perfil con un nivel en la
+    # presión del suelo, y su temperatura arrastra la de la piel: sobre la CDMX a
+    # mediodía (NOAA-21, 2026-09-22) daba 25 °C con 14 °C 20 hPa más arriba —11 K
+    # en ~200 m— y 34 °C de piel. Dentro del perfil deforma la curva y, sobre
+    # todo, la parcela, que se levanta desde el nivel más bajo. Se conserva como
+    # dato (surface_T, surface_Td) para que el diagrama lo marque sin unirlo.
+    surface_T = surface_Td = np.nan
+    if p.size > 1 and np.isfinite(p_surf) and abs(p[0] - p_surf) < 0.05:
+        surface_T = float(T[0])
+        surface_Td = float(thermo.dewpoint_from_mixing_ratio(p[:1], w[:1])[0])
+        p, T, w = p[1:], T[1:], w[1:]
+
     Td = thermo.dewpoint_from_mixing_ratio(p, w)
 
     cape = stability[STABILITY_CAPE] if stability.size > STABILITY_CAPE else np.nan
@@ -194,6 +206,7 @@ def read_sounding(paths, lat=None, lon=None, max_dist_km=100.0,
         requested_lat=requested[0], requested_lon=requested[1],
         dist_km=dist_km,
         surface_pressure=p_surf,
+        surface_T=surface_T, surface_Td=surface_Td,
         cape=float(cape), lifted_index=float(li),
         quality=quality, quality_label=quality_label,
         timestamp=timestamp,

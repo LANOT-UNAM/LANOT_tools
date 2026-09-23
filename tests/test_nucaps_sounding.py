@@ -186,6 +186,18 @@ def test_cae_lo_que_esta_bajo_la_superficie(tmp_path, perfil):
     assert s.surface_pressure == pytest.approx(500.0)
 
 
+def test_el_nivel_de_superficie_va_aparte(tmp_path, perfil):
+    # NUCAPS cierra el perfil con un nivel EN la presión del suelo, cuya T
+    # arrastra la de la piel. No entra al perfil: queda en surface_T/_Td.
+    p = perfil['pressure']
+    ps = float(p[p < 900].max())            # un nivel que coincide con el suelo
+    path = escribe_granulo(tmp_path / 'NUCAPS-EDR_v3r2_j01_s202608291918189_e_c.nc',
+                           perfil, lats=[19.47], lons=[-98.72], quality=[0], p_surf=ps)
+    s = ns.read_sounding([path], 19.5, -98.7)
+    assert s.p.max() < ps
+    assert np.isfinite(s.surface_T) and np.isfinite(s.surface_Td)
+
+
 def test_los_niveles_van_de_la_superficie_hacia_arriba(granulo):
     s = ns.read_sounding([granulo], 19.5, -98.7)
     assert np.all(np.diff(s.p) < 0)

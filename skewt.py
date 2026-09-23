@@ -57,6 +57,7 @@ STYLE = {
     'dewpoint':   ('green',     1.1,  None),
     'parcel':     ('black',     0.7,  'dashed'),
     'level':      ('purple',    0.4,  'dotted'),
+    'surface':    ('saddlebrown', 0.6, None),
 }
 
 
@@ -212,6 +213,35 @@ class SkewT:
         self._polys(out, 'temp', [self.curve(snd.T - thermo.T0, pc)])
         self._polys(out, 'dewpoint', [self.curve(snd.Td - thermo.T0, pc)])
 
+    def _surface(self, out, snd):
+        """El nivel de superficie de NUCAPS, marcado y SIN unir al perfil.
+
+        Ver nucaps_sounding: su temperatura arrastra la de la piel, así que unido a
+        la curva fingía una capa superadiabática de varios K y la parcela salía de
+        ahí. Se dibuja la línea del suelo a su presión y un punto para T y otro para
+        Td, del color de su curva.
+        """
+        p_s = getattr(snd, 'surface_pressure', np.nan)
+        if not (np.isfinite(p_s) and self.pmin <= p_s <= self.pmax):
+            return False
+        y = float(self.y_of(p_s))
+        color, lw, _ = STYLE['surface']
+        out.append("\n  % superficie (nivel de NUCAPS, aparte del perfil)")
+        out.append(f'  color "{color}"  line_width {lw}  dash "solid"')
+        out.append(f'  rule(y={_fmt(y, 4)}, label="Sup. {p_s:.0f}", label_at="axis")')
+        for key, val in (('temp', getattr(snd, 'surface_T', np.nan)),
+                         ('dewpoint', getattr(snd, 'surface_Td', np.nan))):
+            if not np.isfinite(val):
+                continue
+            (x, yy), = self.curve([val - thermo.T0], [p_s])
+            if self.tmin <= x <= self.tmax:
+                # El color va como ARGUMENTO: un `marker` suelto no toma el de la
+                # sentencia `color`, sale negro.
+                c = STYLE[key][0]
+                out.append(f'  marker(3, shape="circle", color="{c}", fill="{c}") '
+                           f'{{ {_fmt(x)} {_fmt(yy, 4)} }}')
+        return True
+
     def _parcel(self, out, snd):
         """Parcela levantada desde el nivel más bajo, con LCL, LFC y EL."""
         if not (np.isfinite(snd.T[0]) and np.isfinite(snd.Td[0])):
@@ -277,7 +307,7 @@ class SkewT:
         out.append(source)
         out.append(f"LanotLogo(size={LOGO_SIZE}, at=({_fmt(0.5)}, {_fmt(y)}))")
 
-    def _legend(self, out):
+    def _legend(self, out, snd=None):
         """Qué es cada curva.
 
         Arriba a la izquierda es la esquina fría de la troposfera alta, que ningún
@@ -296,6 +326,12 @@ class SkewT:
                    f'polyline {{ 0 0.5  1 0.5 }} }}')
         out.append(f'    entry("Parcela") {{ color "{pc}" line_width {pw} '
                    f'dash "{pd}" polyline {{ 0 0.5  1 0.5 }} }}')
+        p_s = getattr(snd, 'surface_pressure', np.nan) if snd is not None else np.nan
+        if (np.isfinite(getattr(snd, 'surface_T', np.nan)) and np.isfinite(p_s)
+                and self.pmin <= p_s <= self.pmax):
+            sc, sw, _ = STYLE['surface']
+            out.append(f'    entry("Superficie (puntos: T, Td)") {{ color "{sc}" '
+                       f'line_width {sw} polyline {{ 0 0.5  1 0.5 }} }}')
         out.append('  }')
 
     def _table(self, out, snd):
@@ -351,12 +387,13 @@ class SkewT:
         ]
         self._background(out)
         self._profile(out, snd)
+        self._surface(out, snd)
         self._parcel(out, snd)
         self._isobars(out)
         out.append("\n  % ejes")
         out.append('  xaxis(step=10, label="Temperatura (°C)")')
         out.append('  yaxis(label="Presión (hPa)", ticks="none", tick_labels=false)')
-        self._legend(out)
+        self._legend(out, snd)
         self._table(out, snd)
         out.append("}")
         self._header(out, snd, title)
