@@ -90,8 +90,9 @@ def _escribe(path, perfil, lats, lons, quality, stability_over, ps):
         if stability_over:
             for col, val in stability_over.items():
                 st[:, col] = val
-        var('Stability', ('Number_of_CrIS_FORs',
-                          'Number_of_Stability_Parameters'))[:] = st
+        stab = var('Stability', ('Number_of_CrIS_FORs', 'Number_of_Stability_Parameters'))
+        stab.valid_range = np.array([0., 1e6], 'f4')     # como el real: solo le sirve al CAPE
+        stab[:] = st
 
         qf = ds.createVariable('Quality_Flag', 'i4', ('Number_of_CrIS_FORs',),
                                fill_value=-9999)
@@ -210,6 +211,13 @@ def test_cape_y_li_salen_de_stability(granulo):
     s = ns.read_sounding([granulo], 19.5, -98.7)
     assert s.cape == pytest.approx(1500.0)          # Stability[0]
     assert s.lifted_index == pytest.approx(-3.5)    # Stability[9]
+
+
+def test_un_lifted_index_negativo_no_se_pierde(granulo):
+    # El granulo trae LI = -3.5 y Stability declara valid_range [0, 1e6]: con el
+    # enmascarado automático de netCDF4 salía NaN y el Skew-T decía "n/d".
+    s = ns.read_sounding([granulo], 19.5, -98.7)
+    assert s.lifted_index == pytest.approx(-3.5)
 
 
 def test_deriva_el_punto_de_rocio(granulo):

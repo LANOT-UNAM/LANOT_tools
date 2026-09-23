@@ -160,7 +160,13 @@ def read_sounding(paths, lat=None, lon=None, max_dist_km=100.0,
         p_surf = float(_to_nan(ds.variables['Surface_Pressure'][i]))
         for_lat = float(_to_nan(ds.variables['Latitude'][i]))
         for_lon = float(_to_nan(ds.variables['Longitude'][i]))
-        stability = _to_nan(ds.variables['Stability'][i])
+        # Sin el enmascarado automático de netCDF4: Stability declara
+        # valid_range = [0, 1e6], que solo le sirve al CAPE, y con él todo Lifted
+        # Index negativo —justo el de una atmósfera inestable— salía NaN y el
+        # Skew-T decía "n/d". Los centinelas (-999, -9999) los quita _to_nan.
+        st_var = ds.variables['Stability']
+        st_var.set_auto_mask(False)
+        stability = _to_nan(st_var[i])
         t_msec = float(_to_nan(ds.variables['Time'][i]))
         # El satélite, del propio archivo: HEAP nombra 'n21' a NOAA-21, que no es
         # el código de los SDR ('j02'), y del nombre salía solo "NOAA".
