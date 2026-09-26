@@ -233,7 +233,7 @@ class TestEnrichFromFilename:
             ('noaa21_atms_rain_rate_20260926_082141_wgs84_geo_5km.tif', 'Rain Rate', 'mm/h'),
             ('noaa21_atms_tpw_20260926_082141_wgs84_geo_5km.tif', 'Total Precipitable Water', 'mm'),
             ('noaa21_atms_btemp_88v_20260926_082141_wgs84_geo_5km.tif', '88 GHz', 'K'),
-            ('npp_atms_btemp_165h_20260926_085934_wgs84_geo_5km.tif', '165 GHz', 'K'),
+            ('npp_atms_btemp_165h_20260926_085934_wgs84_geo_5km.tif', 'Convective Ice (165 GHz)', 'K'),
         ]
         for nombre, producto, unidades in casos:
             m = Metadata()

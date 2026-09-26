@@ -495,7 +495,7 @@ class Metadata:
                 ('rain_rate',        'Rain Rate',            'mm/h'),
                 ('_tpw_',            'Total Precipitable Water', 'mm'),
                 ('btemp_88v',        '88 GHz',               'K'),
-                ('btemp_165h',       '165 GHz',              'K'),
+                ('btemp_165h',       'Convective Ice (165 GHz)', 'K'),
                 ('topography',        'Topography',          'm'),
                 ('flood',            'Flood',                None),
                 ('water',            'Flood',                None),
