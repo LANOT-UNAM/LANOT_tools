@@ -1,0 +1,29 @@
+# mirs_tpw.cpt
+# Agua precipitable total (TPW) de CSPP MiRS sobre ATMS, en mm.
+# Rango fijo de 0 a 80 mm en pasos de 5: la primera pasada (NOAA-21,
+# 2026-09-26) dio de 5 a 85 mm con mediana de 47. En el tropico humedo de
+# septiembre se pasa de 70; el norte de Mexico en invierno baja de 10.
+# Rampa de seco a humedo: cafes, verdes, azules y morados, la convencion de
+# los mapas de TPW de NOAA/CIRA.
+# UNIT = mm
+# COLOR_MODEL = RGB
+# Value R G B   Value R G B
+0     110  60  20    5    110  60  20
+5     150  95  40   10    150  95  40
+10    190 140  70   15    190 140  70
+15    220 190 120   20    220 190 120
+20    200 225 150   25    200 225 150
+25    140 210 110   30    140 210 110
+30     70 180  70   35     70 180  70
+35     20 150  60   40     20 150  60
+40     20 170 170   45     20 170 170
+45     40 190 230   50     40 190 230
+50     40 130 230   55     40 130 230
+55     30  70 200   60     30  70 200
+60     50  30 160   65     50  30 160
+65    110  30 170   70    110  30 170
+70    170  50 190   75    170  50 190
+75    230 110 230   80    230 110 230
+B     0   0   0
+F   230 110 230
+N     0   0   0

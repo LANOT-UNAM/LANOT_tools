@@ -1,0 +1,27 @@
+# mirs_rain_rate.cpt
+# Tasa de lluvia (RR) de CSPP MiRS sobre ATMS, en mm/h.
+# El primer tramo, 0-0.2 mm/h, va en gris oscuro: es "sin lluvia", que es dato
+# valido, y tiene que distinguirse del negro de fuera del barrido. Asi la vista
+# ensena la franja que cubrio ATMS y, dentro, donde llueve.
+# Rango fijo de 0 a 20 mm/h: la primera pasada (NOAA-21, 2026-09-26, con un
+# ciclon frente al Pacifico) llego a 9.7; con ATMS a ~16 km un nucleo de tormenta
+# se promedia y rara vez pasa de 20. Lo de arriba se satura en el ultimo color.
+# Colores de los mapas de precipitacion habituales: azules para lluvia ligera,
+# verdes, amarillos y rojos para la intensa, magenta para la extrema.
+# UNIT = mm/h
+# COLOR_MODEL = RGB
+# Value R G B   Value R G B
+0      45  45  45    0.2   45  45  45
+0.2   160 210 255    1    160 210 255
+1      80 150 255    2     80 150 255
+2      20  90 230    3     20  90 230
+3       0 190  90    4      0 190  90
+4       0 140  40    6      0 140  40
+6     250 235   0    8    250 235   0
+8     255 160   0   10    255 160   0
+10    240  40   0   13    240  40   0
+13    180   0  20   16    180   0  20
+16    220   0 220   20    220   0 220
+B     0   0   0
+F   220   0 220
+N     0   0   0

@@ -227,6 +227,21 @@ class TestEnrichFromFilename:
         assert m.get('product') == 'Total Ozone'
         assert m.get('units') == 'DU'
 
+    def test_mirs_atms(self):
+        # Nombres como los escribe Polar2Grid con el lector mirs (tahan, 2026-09-26)
+        casos = [
+            ('noaa21_atms_rain_rate_20260926_082141_wgs84_geo_5km.tif', 'Rain Rate', 'mm/h'),
+            ('noaa21_atms_tpw_20260926_082141_wgs84_geo_5km.tif', 'Total Precipitable Water', 'mm'),
+            ('noaa21_atms_btemp_88v_20260926_082141_wgs84_geo_5km.tif', '88 GHz', 'K'),
+            ('npp_atms_btemp_165h_20260926_085934_wgs84_geo_5km.tif', '165 GHz', 'K'),
+        ]
+        for nombre, producto, unidades in casos:
+            m = Metadata()
+            m.enrich_from_filename(nombre)
+            assert m.get('product') == producto, nombre
+            assert m.get('units') == unidades, nombre
+            assert m.get('sensor') == 'ATMS', nombre
+
     def test_generico_no_le_gana_a_los_de_nube(self):
         """El respaldo va al final de product_map a proposito."""
         m = Metadata()

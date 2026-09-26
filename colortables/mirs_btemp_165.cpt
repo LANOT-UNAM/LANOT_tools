@@ -1,0 +1,31 @@
+# mirs_btemp_165.cpt
+# Temperatura de brillo a 165 GHz (canal 17 de ATMS), corregida de limbo por el
+# lector mirs de Polar2Grid, en K.
+# A 165 GHz el vapor de agua de la atmosfera baja tapa la superficie, asi que
+# tierra y mar despejados se ven parecidos (~270-290 K), y lo unico que baja
+# la temperatura de brillo es la dispersion por hielo de las torres
+# convectivas. Por eso es este canal y no el de 88 GHz el que tiene vista:
+# ATMS solo mide 88 GHz en polarizacion vertical, sin la horizontal no se
+# puede quitar el fondo frio del mar (lo que hace la PCT de 89 GHz del NRL),
+# y en la primera pasada el Golfo de Mexico despejado salio a 210-230 K, del
+# mismo color que la conveccion.
+# Dos regimenes, como las vistas de microondas del NRL:
+#   - color  (150-260 K): hielo, o sea conveccion y bandas de los ciclones;
+#     mas frio, mas intenso.
+#   - gris   (260-300 K): todo lo demas, de claro a oscuro.
+# La primera pasada (NOAA-21, 2026-09-26) llego a 151 K en los nucleos y
+# mostraba la espiral de un ciclon frente al Pacifico.
+# UNIT = K
+# COLOR_MODEL = RGB
+# Value R G B   Value R G B
+150    60   0  80   180   120   0 120
+180   120   0 120   200   200   0 200
+200   200   0 200   215   230   0  60
+215   230   0  60   230   255 120   0
+230   255 120   0   245   255 230   0
+245   255 230   0   252    60 200  40
+252    60 200  40   260     0 190 220
+260   210 210 210   300    60  60  60
+B     0   0   0
+F    60  60  60
+N     0   0   0

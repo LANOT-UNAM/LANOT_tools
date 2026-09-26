@@ -488,6 +488,14 @@ class Metadata:
                 # omps_a_geotiff.py de la cadena polar con el nombre de la
                 # variable del NetCDF, como haria Polar2Grid.
                 ('columnamounto3',   'Total Ozone',          'DU'),
+                # Microondas de ATMS, CSPP MiRS. Polar2Grid bautiza con el nombre
+                # del producto del lector mirs: noaa21_atms_rain_rate_..., _tpw_,
+                # _btemp_88v_. Cada canal lleva su frecuencia en la etiqueta porque
+                # es lo que distingue una vista de otra.
+                ('rain_rate',        'Rain Rate',            'mm/h'),
+                ('_tpw_',            'Total Precipitable Water', 'mm'),
+                ('btemp_88v',        '88 GHz',               'K'),
+                ('btemp_165h',       '165 GHz',              'K'),
                 ('topography',        'Topography',          'm'),
                 ('flood',            'Flood',                None),
                 ('water',            'Flood',                None),
