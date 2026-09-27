@@ -11,7 +11,8 @@ LANOT_tools proporciona módulos integrados para el procesamiento de datos satel
 - **glm_renderer.py** - Renderizador de datos del GLM (Geostationary Lightning Mapper). Genera capas RGBA de densidad de rayos a partir de archivos NetCDF GLM, usable como módulo desde `mapdrawer` o de forma standalone
 - **ash_view_generator.py** - Visualizador de detección de ceniza volcánica. Superpone el producto de ceniza (GeoTIFF uint8 con colormap generado por `detect_ash.py`) sobre una imagen base ABI, con capas vectoriales opcionales via MapDrawer
 - **colorpalettetable.py** - Manejo de paletas GMT-style CPT con gradientes continuos y discretos. Puede construir paletas desde archivos CPT o desde el tag `colormap` embebido en GeoTIFFs generados por CSPP VIIRS ATMOS
-- **metadata.py** - Contenedor dict-like para gestión de metadatos GeoTIFF con helpers de transformación. Detecta producto y unidades físicas (K, m) a partir del nombre del archivo
+- **metadata.py** - Contenedor dict-like para gestión de metadatos GeoTIFF con helpers de transformación. Lee el Item de STAC de `hpsv -j`. Detecta producto y unidades físicas (K, m) a partir del nombre del archivo
+- **stac_item.py** - Escribe el Item de STAC de la imagen que sale de `mapdrawer` o `geotiff2view` (`--stac`): huella en EPSG:4326, plataforma, rejilla del activo
 
 ## Instalación
 
@@ -99,6 +100,42 @@ mapdrawer imagen.png --metadata hpsv_G16_conus_2024220_1302_ash.json \
   -o output.png
 ```
 
+### Metadatos: Items de STAC
+
+`mapdrawer` y `geotiff2view` escriben con `--stac` un [Item de STAC](https://stacspec.org)
+de la imagen que producen, para que un catálogo pueda indexarla con herramientas
+estándar (STAC Browser, QGIS, `pystac-client`):
+
+```bash
+# Vista de mesoescala reproyectada a Web Mercator, con su Item
+mapdrawer hpsv_G19_m1_2026255_0000_truecolor.png \
+  -m hpsv_G19_m1_2026255_0000_truecolor.json \
+  --layer COASTLINE:white:0.0005 --o_crs epsg:3857 \
+  -o 20260912_0000_G19_m1.png --stac
+# → lanot_G19_m1_2026255_0000_truecolor.json junto a la imagen
+
+# Vista polar
+geotiff2view npp_viirs_sst_20260925_195149.tif --cpt sst.cpt -o sst.png --stac
+# → lanot_npp_2026268_1951_SST.json
+```
+
+- **Un Item por vista**, con id `lanot_…`. Si parte de un Item de hpsv (`-m`),
+  el id es el de hpsv con otro prefijo y el Item lo enlaza con `derived_from`.
+- **La huella (`geometry`, `bbox`) es donde hay dato**, no el rectángulo de la
+  imagen: con `-m` se hereda de hpsv aunque se reproyecte; con `--clip` es la caja
+  recortada.
+- **La rejilla de la imagen va en el activo**: `proj:transform`, `proj:shape`,
+  `proj:wkt2`, `proj:epsg` y `proj:bbox`. `proj:bbox` es lo mismo que el `bounds`
+  del JSON plano de `--o_crs`.
+- `--stac RUTA` acepta un archivo o un directorio; sin RUTA el Item va junto a la
+  imagen como `<id>.json`.
+- **Sin fecha o sin CRS no hay Item**: el programa sale con 1 (la imagen ya quedó
+  escrita). La fecha sale de los metadatos o del nombre del archivo.
+
+Por ahora es **aditivo**: el JSON plano que escribe `mapdrawer --o_crs` sigue
+igual, porque lo leen los guiones de mesoescala y el visor de animaciones. Lo
+que falta para retirarlo está en [`docs/plan_stac_emision.md`](docs/plan_stac_emision.md).
+
 ### Ceniza volcánica: GeoTIFF base + producto de ceniza
 
 ```bash
@@ -164,6 +201,8 @@ bonito y dice algo que no es. Ver [`docs/plan_skewt.md`](docs/plan_skewt.md).
 | `--crs CRS` | Sistema de coordenadas: `epsg:4326`, cadena Proj4 o WKT |
 | `--metadata FILE` | Item de STAC de `hpsv -j` (CRS, límites y fecha) para imágenes sin georref. Con varios activos (`-B`) usa el que se llama como la imagen |
 | `--clip REGION` | Recortar a región: `ULX,ULY,LRX,LRY` o nombre predefinido (`conus`, `fulldisk`) |
+| `--o_crs CRS` | Reproyectar la imagen antes de dibujar (ej. `epsg:3857`). Si la salida no es GeoTIFF escribe además `<salida>.json` plano con `crs` y `bounds` |
+| `--stac [RUTA]` | Escribir el Item de STAC de la imagen de salida (ver «Metadatos: Items de STAC») |
 | `--layer NOMBRE:COLOR:GROSOR[:labels]` | Capa vectorial (`COASTLINE`, `COUNTRIES`, `MEXSTATES`) o grilla (`grid10`) |
 | `--logo-pos N` | Posición del logo (0=UL, 1=UR, 2=LL, 3=LR) |
 | `--logo-size S` | Tamaño del logo (px, float ≤1.0 o porcentaje) |
@@ -210,7 +249,8 @@ bonito y dice algo que no es. Ver [`docs/plan_skewt.md`](docs/plan_skewt.md).
 | `--font-color C` | Color del texto (ej. `white`, `yellow`) |
 | `--lat-south LAT` | Reserva espacio sur a partir de esa latitud para la barra de color; solo actúa si hay CPT y el borde sur de los datos está al norte de LAT |
 | `--compress` | Con `--lat-south`: comprime los datos en lugar de desplazarlos (preserva el norte exacto) |
-| `--save-metadata FILE` | Exporta CRS, bounds y timestamp a JSON |
+| `--stac [RUTA]` | Escribir el Item de STAC de la imagen de salida (ver «Metadatos: Items de STAC») |
+| `--save-metadata FILE` | Exporta CRS, bounds y timestamp a un JSON plano (formato anterior a STAC; se retirará) |
 | `--verbose` | Mensajes de depuración |
 
 #### Códigos de salida de geotiff2view
@@ -219,7 +259,7 @@ bonito y dice algo que no es. Ver [`docs/plan_skewt.md`](docs/plan_skewt.md).
 |---|---|
 | 0 | Imagen generada |
 | 3 | El GeoTIFF **no tenía un solo píxel válido**: no se escribió ni la imagen ni el JSON de `--save-metadata` |
-| 1 | Error |
+| 1 | Error, incluido `--stac` sin fecha o sin CRS (la imagen sí se escribió) |
 | 2 | Error de uso (argparse) |
 
 El 3 **no es un fallo**: hay productos que salen legítimamente vacíos en una
@@ -294,7 +334,8 @@ if glm_layer:
 - **Overlay GLM**: Densidad de rayos del GLM (histograma 2D vectorizado) con color y opacidad configurables
 - **Overlay de ceniza**: Superposición georreferenciada de producto de detección de ceniza volcánica (uint8+colormap) con leyenda integrada
 - **Timestamp unificado ABI/GLM**: Cadena automática con rango temporal del GLM (`format_timestamp_glm()`)
-- **Metadata flexible**: Extracción automática de GeoTIFF o JSON sidecar
+- **Metadata flexible**: Extracción automática de GeoTIFF o del Item de STAC de `hpsv -j`
+- **Items de STAC**: `--stac` describe cada imagen producida (huella, fecha, plataforma, rejilla) para catálogos estándar
 - **Regiones predefinidas**: `conus`, `fulldisk` y cualquier región definida en `docs/recortes_coordenadas.csv` de la instalación
 
 ## Paletas CPT incluidas
@@ -327,6 +368,9 @@ búfer de `clip_loader.c` en hpsv).
 - Python >= 3.8
 - **Requeridos**: Pillow, fiona, pyproj, numpy
 - **Opcionales**: rasterio (lectura GeoTIFF con metadata, altamente recomendado)
+- **Pruebas**: `pip install -r requirements-dev.txt` (pytest y jsonschema, que valida
+  los Items de STAC contra los esquemas oficiales en `tests/data/stac_schemas/`).
+  `python3 -m pytest tests/`
 
 ## Recursos del sistema
 
@@ -358,11 +402,14 @@ LANOT_tools/
 ├── glm_renderer.py          # Módulo/CLI: renderizado de datos GLM
 ├── ash_view_generator.py    # Módulo/CLI: visualización de ceniza volcánica
 ├── colorpalettetable.py     # Manejo de paletas CPT
-├── metadata.py              # Contenedor de metadata
+├── metadata.py              # Contenedor de metadata (lee el Item de STAC de hpsv)
+├── stac_item.py             # Escribe el Item de STAC de las vistas (--stac)
 ├── GLMconus_png.sh          # Pipeline GLM CONUS (ABI C13 + rayos)
 ├── crea_vistas_viirs.sh     # Procesamiento por lote de productos VIIRS
 ├── *.cpt                    # Paletas de color incluidas
 ├── recortes/                # recortes_coordenadas.csv (claves para --clip / hpsv -c)
+├── docs/                    # Planes de diseño (plan_stac_emision.md, plan_glm_grid.md, …)
+├── tests/                   # pytest; tests/data con Items de hpsv y esquemas de STAC
 ├── setup.py                 # Configuración pip
 ├── install.sh / uninstall.sh
 └── README.md

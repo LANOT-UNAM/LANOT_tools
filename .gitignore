@@ -212,4 +212,6 @@ __marimo__/
 
 # Fixtures de prueba versionados (excepción a *.json)
 !tests/data/*.json
+# Esquemas oficiales de STAC que valida tests/test_stac_item.py (copia de hpsatviews)
+!tests/data/stac_schemas/**/*.json
 

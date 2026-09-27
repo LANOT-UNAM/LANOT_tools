@@ -6,7 +6,7 @@ setup(
     description="Herramientas y utilidades comunes para LANOT (Laboratorio Nacional de Observación de la Tierra)",
     author="Abraham Sierra",
     py_modules=["mapdrawer", "geotiff2view", "colorpalettetable", "metadata", "glm_renderer",
-                "ash_view_generator", "thermo", "nucaps_sounding", "skewt"],
+                "ash_view_generator", "thermo", "nucaps_sounding", "skewt", "stac_item"],
     install_requires=[
         "Pillow",
         "fiona",
@@ -18,7 +18,7 @@ setup(
     ],
     extras_require={
         # Solo desarrollo; install.sh no las instala en el servidor.
-        "dev": ["pytest"],
+        "dev": ["pytest", "jsonschema"],
     },
     python_requires=">=3.8",
     entry_points={

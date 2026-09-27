@@ -367,6 +367,20 @@ class MapDrawer:
                 # Fallback a todo el mundo
                 self.bounds = {'ulx': -180, 'uly': 90, 'lrx': 180, 'lry': -90}
 
+    def output_grid(self):
+        """
+        Límites (left, bottom, right, top) de la imagen actual en el CRS de
+        destino: la rejilla con la que se dibujaron las capas, ya recortada.
+        None si no hay proyección (modo lineal) o no se fijaron límites.
+        """
+        pb = getattr(self, 'proj_bounds', None)
+        if not self.use_proj or not pb or not pb['width'] or not pb['height']:
+            return None
+        left, top = pb['min_x'], pb['max_y']
+        right, bottom = left + pb['width'], top + pb['height']
+        return (min(left, right), min(bottom, top),
+                max(left, right), max(bottom, top))
+
     def get_region_bounds(self, recorte_name, csv_path=None):
         """Obtiene los límites (ulx, uly, lrx, lry) de una región por nombre."""
         name_lower = recorte_name.lower()
@@ -1327,6 +1341,11 @@ def main():
     parser.add_argument("--o_crs",
                         help="Reproyectar la salida a este CRS antes de dibujar (ej: 'epsg:3857', 'epsg:4326'). "
                              "Requiere que los metadatos tengan CRS y bounds.")
+    parser.add_argument("--stac", nargs='?', const=True, metavar="RUTA",
+                        help="Escribir un Item de STAC de la imagen de salida. Sin RUTA va junto a la "
+                             "imagen como <id>.json; RUTA puede ser un archivo o un directorio. Con "
+                             "--metadata el Item enlaza al de hpsv (derived_from) y hereda su huella. "
+                             "No sustituye al sidecar plano de --o_crs.")
     parser.add_argument("--verbose", "-v", action="store_true",
                         help="Mostrar mensajes de depuración")
 
@@ -1400,6 +1419,23 @@ def main():
         for key in ['crs', 'bounds', 'timestamp', 'satellite']:
             if key in external_meta:
                 metadata[key] = external_meta[key]
+
+    # Para --stac: el Item de origen y la rejilla de ENTRADA, tomada antes de
+    # --lat-south (que añade filas vacías) y de --o_crs (cuyo rectángulo tiene
+    # esquinas de nodato). De ahí sale la huella cuando no se hereda.
+    stac_source = None
+    stac_meta = {}
+    stac_input_grid = None
+    if args.stac:
+        stac_meta = metadata.to_dict()
+        if args.metadata:
+            with open(args.metadata) as f:
+                stac_source = json.load(f)
+            for key in ('product', 'band'):
+                if key in external_meta:
+                    stac_meta[key] = external_meta[key]
+        if metadata.get('crs') and metadata.get('bounds') is not None:
+            stac_input_grid = (metadata['crs'], tuple(metadata['bounds']))
 
     try:
         img = Image.open(args.input_image).convert(
@@ -1851,6 +1887,32 @@ def main():
     except Exception as e:
         print(f"Error guardando imagen: {e}", file=sys.stderr)
         sys.exit(1)
+
+    # Item de STAC (--stac). Falla en voz alta, como 'hpsv -j': un Item sin
+    # huella o sin fecha es un huérfano que ningún catálogo encuentra.
+    if args.stac:
+        import stac_item
+        out_grid = mapper.output_grid()
+        # Con recorte o límites manuales la huella es la caja de la salida;
+        # sin ellos, la del Item de origen o la de la rejilla de entrada.
+        if args.clip or args.bounds:
+            fp_grid = (target_crs, out_grid) if out_grid else None
+        elif stac_source:
+            fp_grid = None
+        else:
+            fp_grid = stac_input_grid
+        if args.cpt:
+            stac_meta['cpt'] = os.path.basename(args.cpt)
+        try:
+            path = stac_item.emit(args.stac, output_path, target_crs, out_grid,
+                                  img.size, stac_meta, 'mapdrawer',
+                                  footprint_grid=fp_grid,
+                                  source_item=stac_source,
+                                  source_path=args.metadata)
+            print(f"Item de STAC guardado en {path}")
+        except Exception as e:
+            print(f"Error escribiendo el Item de STAC: {e}", file=sys.stderr)
+            sys.exit(1)
 
 
 if __name__ == "__main__":

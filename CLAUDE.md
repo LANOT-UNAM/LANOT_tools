@@ -42,13 +42,13 @@ sudo /opt/lanot-tools/venv/bin/pip install pytest
 /opt/lanot-tools/venv/bin/python -m pytest tests/
 ```
 
-Expected on a healthy checkout: **265 passed, 0 skipped** (medido el 2026-09-12 con `/opt/lanot-tools/venv` + pytest en un `--target`, tras la fase 4 de STAC y la regla de tamaños < 1). Conteos anteriores —224 el 2026-08-30; 114 passed, 33 skipped antes— ya no aplican: aquellos saltos eran por datos de muestra ausentes, no por dependencias.
+Expected on a healthy checkout: **323 passed, 0 skipped** (medido el 2026-09-26 con `python3` del sistema, que trae pytest, jsonschema y las dependencias de ejecución, tras añadir `--stac`). Conteos anteriores —265 el 2026-09-12, 224 el 2026-08-30; 114 passed, 33 skipped antes— ya no aplican: aquellos saltos eran por datos de muestra ausentes, no por dependencias. `tests/test_stac_item.py` necesita además `jsonschema` (con `referencing`), que tampoco está en el venv del servidor.
 
 Los tests del Skew-T que compilan un `.mg` se saltan solos si `mg` no está en el PATH; los del lector NUCAPS, si falta `netCDF4`.
 
 ## Architecture
 
-The system has three CLI entry points and six importable library modules:
+The system has three CLI entry points and seven importable library modules:
 
 ### Entry Points
 - **`geotiff2view.py`** — Reads GeoTIFF → converts to PNG/JPEG with color palettes (CPT). Delegates to `MapDrawer` internally for overlays. Handles single-band + CPT, RGB composites from 3 separate TIFFs, NoData transparency.
@@ -61,6 +61,7 @@ The system has three CLI entry points and six importable library modules:
 - **`glm_renderer.py`** — Renders GLM (Geostationary Lightning Mapper) NetCDF files as RGBA layers. Two independent modes: `render_glm_layer()` draws a qualitative glow from L2 LCFA events (`mapdrawer --glm`, or standalone); `render_glm_grid_layer()` accumulates gridded GLMF products (FED/MFA/TOE) over a multi-minute window and colors them by physical value with a CPT (`mapdrawer --glm-grid`). See `plan_glm_grid.md`.
 - **`thermo.py`** — Moist-atmosphere thermodynamics in pure numpy, no I/O: Bolton saturation vapor pressure, dewpoint from mixing ratio, dry/moist adiabats, LCL (Bolton 1980), parcel ascent, LFC/EL. Everything is hPa + Kelvin + kg/kg. This is where a Skew-T goes silently wrong, so it has no dependencies and is tested on its own.
 - **`nucaps_sounding.py`** — Reads NUCAPS-EDR granules (CSPP HEAP) and extracts one vertical profile. A granule is a 120-FOR swath slice, not a grid, so "the profile at (lat, lon)" means the nearest FOR: it always returns the FOR's *real* coordinates plus the distance to what was asked. Derives dewpoint from `H2O_MR` (NUCAPS does not carry one) and reads CAPE/Lifted Index from `Stability[:, 0]` and `[:, 9]`.
+- **`stac_item.py`** — Writes the STAC Item for an image that `mapdrawer --stac` or `geotiff2view --stac` just saved; the inverse of `Metadata.from_stac_item()`. `footprint()` is a port of `hpsatviews/tools/stac_sweep.py` (itself a port of hpsv's `src/footprint.c`) on pyproj; `tests/test_stac_item.py` compares it vertex by vertex against the hpsv Items in `tests/data`, which is the only thing keeping the three copies together.
 - **`ash_view_generator.py`** — Composites a volcanic ash detection GeoTIFF (uint8 + embedded colormap) onto a base ABI image with georeferenced alignment.
 
 ### Key Design Patterns
@@ -78,6 +79,8 @@ The system has three CLI entry points and six importable library modules:
 **Skew-T geometry: the skew lives in the data, not in the renderer** — mg's `yscale="log"` is *not* used. Under a log axis mg remaps coordinate-by-coordinate and matrices don't compose (structs and bare `grid()`/`ticks()`/`axis()` are errors inside), so a shear can't be expressed there. Instead `skewt.py` computes `y = log(p_max/p)` and `x = T + m·y` in Python and uses a **linear** `plot`; `m` is derived from `--skew` and the box aspect so the angle is the one seen on the page. Consequences: pressure gridlines are irregular in `y`, so each isobar is a `rule(y=…, label=…)` rather than a `yaxis(step=…)`; and the pressure axis gets its name from `yaxis(label=…, ticks="none", tick_labels=false)`.
 
 **Metadata JSON = STAC Item** — For non-GeoTIFF images, `mapdrawer --metadata` reads the STAC Item that `hpsv -j` writes (`Metadata.from_stac_item_file()`); the old flat sidecar with `crs`/`bounds` at the root is rejected. Two traps: the root `bbox` is the 4326 *footprint*, not the raster extent — bounds come from the asset's `proj:transform` + `proj:shape`; and with `-B` the Item has two assets on different grids, so the asset is picked by `href` == image basename and the item-level `proj:*` is trusted only when there is a single asset. `Metadata.from_json_file()`/`save_json()` still handle the flat format for `geotiff2view --save-metadata` and the sidecar `mapdrawer --o_crs` writes.
+
+**Emitting STAC (`--stac`)** — Additive: `--save-metadata` and the flat `--o_crs` sidecar are unchanged, because the meso scripts (`crea_animaciones_meso.sh`, `animameso.sh`, the web viewer via `latest.json`) still read `.bounds` from the flat file. The view is its **own** Item, `lanot_…`, never merged into hpsv's: with `-m` its id is the hpsv id with `lanot_` instead of `hpsv_`, it carries `links: [{rel: derived_from}]` to the hpsv Item, and it **inherits** that Item's `geometry`/`bbox` (the data's footprint does not change by reprojecting or annotating; the rectangle of a reprojected full disk would claim nodata corners). With `--clip`/`--bounds` the footprint is the output box instead. The single asset carries its own `proj:transform`/`proj:shape`/`proj:wkt2` and also `proj:bbox`, which equals the flat sidecar's `bounds` so the jq in meso can migrate one field at a time. The Item is named `<id>.json` so it does not collide with the sidecar named after the image. No date or no footprint → exit 1, like `hpsv -j`. No `eo:bands`/`raster:bands` on these 8-bit assets, same rule as hpsv. `geotiff2view` takes the grid from the GeoTIFF, not from MapDrawer: it passes bounds to `set_bounds()` as lat/lon, which is only right in 4326.
 
 **Optional dependencies** — Both tools degrade gracefully: no `rasterio` → PIL-only reading (no geo-metadata); no `pyproj` → linear projection only.
 

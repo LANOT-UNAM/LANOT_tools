@@ -5,3 +5,6 @@
 #
 -r requirements.txt
 pytest
+# Valida los Items de STAC de tests/test_stac_item.py contra los esquemas
+# versionados en tests/data/stac_schemas/. Dependencia dura, no se salta.
+jsonschema

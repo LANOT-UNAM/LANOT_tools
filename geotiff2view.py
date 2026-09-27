@@ -357,6 +357,9 @@ def main():
     parser.add_argument("--legend-pos", type=int, choices=[0, 1, 2, 3], help="Posición de la leyenda (0-3)")
     parser.add_argument("--jpeg", "-j", action="store_true", help="Guardar salida en formato JPEG (por defecto PNG)")
     parser.add_argument("--save-metadata", help="Guardar metadatos (CRS, bounds, timestamp) en un archivo JSON.")
+    parser.add_argument("--stac", nargs='?', const=True, metavar="RUTA",
+                        help="Escribir un Item de STAC de la imagen de salida. Sin RUTA va junto a la "
+                             "imagen como <id>.json; RUTA puede ser un archivo o un directorio.")
     parser.add_argument("--verbose", "-v", action="store_true", help="Mostrar mensajes de depuración")
     parser.add_argument("--autoscale", action="store_true", help="Forzar escalado de datos normalizados (0-1) al rango de la paleta.")
     parser.add_argument("--percentiles", metavar="LO,HI",
@@ -513,6 +516,12 @@ def main():
               file=sys.stderr)
         sys.exit(SIN_DATOS_VALIDOS)
 
+    # Rejilla de entrada para la huella de --stac, antes de que --lat-south
+    # le añada filas vacías al sur.
+    stac_input_grid = None
+    if args.stac and metadata.get('crs') and metadata.get('bounds') is not None:
+        stac_input_grid = (metadata['crs'], tuple(metadata['bounds']))
+
     # Desplazar/comprimir imagen para crear espacio sur para colorbar
     if args.lat_south is not None and cpt_obj is not None:
         img, metadata = make_south_room(img, metadata, args.lat_south,
@@ -603,6 +612,7 @@ def main():
             print("Advertencia: La imagen no es de un solo canal (L), se ignora la paleta.", file=sys.stderr)
 
     # Integración con MapDrawer (Capas y Logo)
+    mapper = None
     if uses_mapdrawer:
         # MapDrawer requiere un modo de color directo (RGB/RGBA) para dibujar elementos con colores arbitrarios (capas, logos, texto).
         if img.mode == 'L' or img.mode == 'P':
@@ -751,6 +761,38 @@ def main():
 
     img.save(output_path)
     print(f"Guardado en {output_path}")
+
+    # Item de STAC (--stac). La rejilla es la del GeoTIFF salvo con --clip,
+    # que es lo único aquí que la cambia; entonces la caja recortada es
+    # además la huella. Falla en voz alta, como 'hpsv -j'.
+    if args.stac:
+        import stac_item
+        stac_meta = Metadata.from_dict(metadata.to_dict())
+        stac_meta.enrich_from_filename(primary_input)
+        if len(input_files) == 3:
+            stac_meta.pop('band', None)
+            if not stac_meta.get('product'):
+                stac_meta['product'] = 'RGB'
+        if args.cpt:
+            stac_meta['cpt'] = os.path.basename(args.cpt)
+        if cpt_obj and getattr(cpt_obj, 'units', None):
+            stac_meta['units'] = cpt_obj.units
+        out_crs = metadata.get('crs')
+        out_grid = metadata.get('bounds')
+        fp_grid = stac_input_grid
+        clipped = mapper.output_grid() if (args.clip and mapper) else None
+        if clipped:
+            out_grid = clipped
+            fp_grid = (out_crs, clipped)
+        try:
+            path = stac_item.emit(args.stac, output_path, out_crs,
+                                  tuple(out_grid) if out_grid is not None else None,
+                                  img.size, stac_meta, 'geotiff2view',
+                                  footprint_grid=fp_grid)
+            print(f"Item de STAC guardado en {path}")
+        except Exception as e:
+            print(f"Error escribiendo el Item de STAC: {e}", file=sys.stderr)
+            sys.exit(1)
 
 if __name__ == "__main__":
     main()
