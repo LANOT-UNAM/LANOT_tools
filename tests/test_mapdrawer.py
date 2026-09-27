@@ -317,8 +317,9 @@ class TestMakeSouthRoom:
         assert out is img
 
     def test_desplaza_conserva_tamano_y_escala(self):
-        """Modo por defecto: mismo tamaño y los mismos grados por píxel."""
+        """Con el norte vacío: mismo tamaño y los mismos grados por píxel."""
         img = _solid_image(w=100, h=200)
+        img.paste((0, 0, 0), (0, 0, 100, 100))  # 100 filas vacías arriba; pad = 90
         meta = _meta_geo(bottom=20.0, top=40.0)  # 0.1 grados/píxel
         out, out_meta = make_south_room(img, meta, lat_south=11.0)
 
@@ -335,6 +336,50 @@ class TestMakeSouthRoom:
         arr = np.array(out)
         assert (arr[-1] == 0).all()
         assert (arr[0] == 50).all()
+
+    def test_no_recorta_filas_con_dato(self):
+        """Pasada corta con dato hasta arriba: el lienzo crece y el norte no se pierde."""
+        img = _solid_image(w=100, h=200, color=(50, 50, 50))
+        meta = _meta_geo(bottom=20.0, top=40.0)  # pad = 90 filas, ninguna vacía
+        out, out_meta = make_south_room(img, meta, lat_south=11.0)
+
+        assert out.size == (100, 290)
+        arr = np.array(out)
+        assert (arr[:200] == 50).all()          # todo el dato, intacto
+        assert (arr[200:] == 0).all()           # el espacio nuevo, vacío
+        left, bottom, right, top = out_meta['bounds']
+        assert top == 40.0
+        assert bottom == pytest.approx(11.0, abs=0.1)
+        assert (top - bottom) / out.height == pytest.approx(0.1, rel=1e-6)
+
+    def test_recorta_solo_lo_vacio_y_crece_lo_demas(self):
+        """Norte con algunas filas vacías: se usan esas y el resto se añade abajo."""
+        img = _solid_image(w=100, h=200, color=(50, 50, 50))
+        img.paste((0, 0, 0), (0, 0, 100, 30))   # 30 filas vacías arriba; pad = 90
+        out, out_meta = make_south_room(img, _meta_geo(), lat_south=11.0)
+
+        assert out.size == (100, 260)
+        arr = np.array(out)
+        assert (arr[:170] == 50).all()
+        assert (arr[170:] == 0).all()
+        assert out_meta['bounds'][3] == pytest.approx(37.0)
+
+    def test_paleta_usa_el_indice_de_nodata(self):
+        """En modo P, 'vacío' es el índice de nodata, no el 0."""
+        img = Image.new('P', (100, 200), 5)
+        img.paste(255, (0, 0, 100, 100))         # 100 filas de nodata arriba
+        out, _ = make_south_room(img, _meta_geo(), lat_south=11.0, n_idx=255)
+        assert out.size == img.size
+        assert (np.array(out)[-90:] == 255).all()
+
+    def test_mascara_sigue_a_los_pixeles_al_crecer(self):
+        img = _solid_image(w=100, h=200)
+        meta = _meta_geo()
+        meta['nodata_mask'] = np.zeros((200, 100), dtype=bool)
+        out, out_meta = make_south_room(img, meta, lat_south=11.0)
+        mask = out_meta['nodata_mask']
+        assert mask.shape == (out.height, out.width)
+        assert not mask[:200].any() and mask[200:].all()
 
     def test_comprime_preserva_el_norte(self):
         """Con compress=True el borde norte no se mueve y el sur baja a lat_south."""

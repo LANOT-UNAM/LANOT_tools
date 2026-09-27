@@ -1183,18 +1183,39 @@ def layer_width(width_arg, ref_size, name="--layer"):
     return width
 
 
+def _filas_vacias_al_norte(img, fill):
+    """Cuántas filas seguidas, desde arriba, son todas del color de relleno.
+
+    En RGBA cuenta como vacío lo transparente; en los demás modos, el propio
+    valor de relleno (el índice de nodata en L/P, el negro en RGB).
+    """
+    arr = np.asarray(img)
+    if img.mode == 'RGBA':
+        vacia = (arr[..., 3] == 0).all(axis=1)
+    elif arr.ndim == 3:
+        vacia = (arr == np.asarray(fill, dtype=arr.dtype)).all(axis=(1, 2))
+    else:
+        vacia = (arr == fill).all(axis=1)
+    return len(vacia) if vacia.all() else int(np.argmin(vacia))
+
+
 def make_south_room(img, metadata, lat_south, compress=False, n_idx=None):
     """
     Crea espacio vacío en la parte inferior de la imagen extendiendo los bounds al sur.
 
-    Cuando el borde sur de los datos está al norte de lat_south, libera pad_px filas
-    en la parte inferior de la imagen (para colorbar u otros elementos) sin cambiar
-    el tamaño total. Los metadatos de bounds se actualizan para mantenerse en sincronía
-    con los píxeles, garantizando una georreferencia correcta en MapDrawer.
+    Cuando el borde sur de los datos está al norte de lat_south, añade pad_px filas
+    vacías en la parte inferior de la imagen (para colorbar u otros elementos). Los
+    metadatos de bounds se actualizan para mantenerse en sincronía con los píxeles,
+    garantizando una georreferencia correcta en MapDrawer.
 
     Modos:
-      compress=False (default): Recorta pad_px filas del norte y las reemplaza por
-          espacio vacío al sur. El norte visible se desplaza hacia el sur.
+      compress=False (default): Recorta del norte las filas VACÍAS que haya, hasta
+          pad_px, y las pega vacías al sur; si no alcanzan, agranda el lienzo hacia
+          el sur con las que falten. Nunca recorta una fila con dato: hasta el
+          2026-09-27 recortaba pad_px filas sin mirar, y una pasada corta de la
+          cadena polar (borde sur en 16-28°N contra lat_south=11) perdía del 10 al
+          67 % de su parte norte sin aviso. Si el norte está vacío, el tamaño se
+          conserva, como antes.
       compress=True: Comprime los datos al alto disponible (H - pad_px) y añade
           el espacio vacío al sur. El norte se preserva exactamente.
 
@@ -1225,32 +1246,38 @@ def make_south_room(img, metadata, lat_south, compress=False, n_idx=None):
     else:  # L, P
         fill = n_idx if n_idx is not None else 0
 
-    new_img = Image.new(img.mode, (W, H), fill)
-
     if compress:
+        new_img = Image.new(img.mode, (W, H), fill)
         resample = Image.Resampling.NEAREST if img.mode == 'P' else Image.Resampling.LANCZOS
         small = img.resize((W, H - pad_px), resample)
         new_img.paste(small, (0, 0))
         new_top = top
         new_bottom = lat_south
+        new_H = H
     else:
-        # Cortar pad_px filas del norte, pegarlas vacías al sur
-        cropped = img.crop((0, pad_px, W, H))
-        new_img.paste(cropped, (0, 0))
-        new_top = top - pad_px * dpp
+        # Del norte solo se cortan filas vacías; lo que falte se añade abajo
+        recorte = min(pad_px, _filas_vacias_al_norte(img, fill))
+        crecer = pad_px - recorte
+        if crecer:
+            debug_msg(f"make_south_room: el norte tiene dato; se recortan {recorte} "
+                      f"filas vacías y el lienzo crece {crecer} hacia el sur")
+        new_H = H + crecer
+        new_img = Image.new(img.mode, (W, new_H), fill)
+        new_img.paste(img.crop((0, recorte, W, H)), (0, 0))
+        new_top = top - recorte * dpp
         new_bottom = bottom - pad_px * dpp  # ≈ lat_south
 
     metadata['bounds'] = (left, new_bottom, right, new_top)
 
     if 'nodata_mask' in metadata:
         mask = metadata['nodata_mask']
-        new_mask = np.ones((H, W), dtype=bool)
+        new_mask = np.ones((new_H, W), dtype=bool)
         if compress:
             mask_img = Image.fromarray((mask * 255).astype(np.uint8))
             mask_small = mask_img.resize((W, H - pad_px), Image.Resampling.NEAREST)
             new_mask[:H - pad_px, :] = np.array(mask_small) > 127
         else:
-            new_mask[:H - pad_px, :] = mask[pad_px:H, :]
+            new_mask[:H - recorte, :] = mask[recorte:H, :]
         metadata['nodata_mask'] = new_mask
 
     return new_img, metadata
