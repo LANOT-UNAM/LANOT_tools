@@ -338,31 +338,51 @@ class TestMakeSouthRoom:
         assert (arr[0] == 50).all()
 
     def test_no_recorta_filas_con_dato(self):
-        """Pasada corta con dato hasta arriba: el lienzo crece y el norte no se pierde."""
+        """Pasada corta con dato hasta arriba: el norte no se pierde y el lienzo
+        crece solo lo que ocupa la barra, no hasta lat_south."""
         img = _solid_image(w=100, h=200, color=(50, 50, 50))
         meta = _meta_geo(bottom=20.0, top=40.0)  # pad = 90 filas, ninguna vacía
         out, out_meta = make_south_room(img, meta, lat_south=11.0)
 
-        assert out.size == (100, 290)
+        assert out.size == (100, 223)           # ceil(200 / 9) = 23 filas más
         arr = np.array(out)
         assert (arr[:200] == 50).all()          # todo el dato, intacto
         assert (arr[200:] == 0).all()           # el espacio nuevo, vacío
         left, bottom, right, top = out_meta['bounds']
         assert top == 40.0
-        assert bottom == pytest.approx(11.0, abs=0.1)
+        assert bottom == pytest.approx(17.7)    # no llega a 11: no hace falta
         assert (top - bottom) / out.height == pytest.approx(0.1, rel=1e-6)
 
-    def test_recorta_solo_lo_vacio_y_crece_lo_demas(self):
-        """Norte con algunas filas vacías: se usan esas y el resto se añade abajo."""
+    def test_franja_libre_alcanza_para_la_barra(self):
+        """Las filas vacías de abajo cubren las 2*(alto//20) donde va la barra."""
+        for h in (57, 200, 410, 1369, 2738):
+            img = _solid_image(w=50, h=h, color=(50, 50, 50))
+            out, _ = make_south_room(img, _meta_geo(bottom=28.0, top=40.0), lat_south=11.0)
+            libres = out.height - h
+            assert libres >= 2 * (out.height // 20), h
+            assert libres <= h // 9 + 2, h        # y no mucho más
+
+    def test_recorta_solo_lo_vacio(self):
+        """Norte con filas vacías que bastan para la barra: se usan y no se crece."""
         img = _solid_image(w=100, h=200, color=(50, 50, 50))
         img.paste((0, 0, 0), (0, 0, 100, 30))   # 30 filas vacías arriba; pad = 90
         out, out_meta = make_south_room(img, _meta_geo(), lat_south=11.0)
 
-        assert out.size == (100, 260)
+        assert out.size == (100, 200)
         arr = np.array(out)
         assert (arr[:170] == 50).all()
         assert (arr[170:] == 0).all()
         assert out_meta['bounds'][3] == pytest.approx(37.0)
+        assert out_meta['bounds'][1] == pytest.approx(17.0)
+
+    def test_recorta_lo_vacio_y_crece_lo_que_falta(self):
+        """Pocas filas vacías arriba: se usan y se crece hasta cubrir la barra."""
+        img = _solid_image(w=100, h=200, color=(50, 50, 50))
+        img.paste((0, 0, 0), (0, 0, 100, 5))    # 5 vacías; la barra pide ~20
+        out, _ = make_south_room(img, _meta_geo(), lat_south=11.0)
+        libres = out.height - 195
+        assert out.height > 200
+        assert libres >= 2 * (out.height // 20)
 
     def test_paleta_usa_el_indice_de_nodata(self):
         """En modo P, 'vacío' es el índice de nodata, no el 0."""
@@ -391,13 +411,19 @@ class TestMakeSouthRoom:
         assert top == 40.0
         assert bottom == 11.0
 
-    def test_noop_si_el_relleno_no_cabe(self):
-        """Si el espacio pedido excede la imagen se devuelve sin cambios."""
+    def test_comprimir_noop_si_el_relleno_no_cabe(self):
+        """Comprimiendo, si el espacio pedido excede la imagen se devuelve sin cambios."""
         img = _solid_image(w=100, h=200)
         meta = _meta_geo(bottom=20.0, top=40.0)
-        out, out_meta = make_south_room(img, meta, lat_south=-100.0)
+        out, out_meta = make_south_room(img, meta, lat_south=-100.0, compress=True)
         assert out is img
         assert tuple(out_meta['bounds']) == (-120.0, 20.0, -100.0, 40.0)
+
+    def test_desplazar_con_relleno_mayor_que_la_imagen(self):
+        """Pasada de muy pocos gránulos: la barra igual cabe, creciendo lo suyo."""
+        img = _solid_image(w=100, h=200)
+        out, _ = make_south_room(img, _meta_geo(), lat_south=-100.0)
+        assert out.size == (100, 223)
 
 
 # ---------------------------------------------------------------------------

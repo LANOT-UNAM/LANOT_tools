@@ -1210,12 +1210,15 @@ def make_south_room(img, metadata, lat_south, compress=False, n_idx=None):
 
     Modos:
       compress=False (default): Recorta del norte las filas VACÍAS que haya, hasta
-          pad_px, y las pega vacías al sur; si no alcanzan, agranda el lienzo hacia
-          el sur con las que falten. Nunca recorta una fila con dato: hasta el
+          pad_px, y las pega vacías al sur. Si no alcanzan para la barra de color,
+          agranda el lienzo hacia el sur, pero solo lo que la barra ocupa (el 10 %
+          inferior de la imagen final), no hasta lat_south: en ese caso el mapa
+          no llega a lat_south. Nunca recorta una fila con dato: hasta el
           2026-09-27 recortaba pad_px filas sin mirar, y una pasada corta de la
           cadena polar (borde sur en 16-28°N contra lat_south=11) perdía del 10 al
-          67 % de su parte norte sin aviso. Si el norte está vacío, el tamaño se
-          conserva, como antes.
+          67 % de su parte norte sin aviso. Crecer hasta lat_south tampoco sirve:
+          una pasada que acaba en 28°N ganaba 17° de mapa vacío. Si el norte está
+          vacío, el tamaño se conserva, como antes.
       compress=True: Comprime los datos al alto disponible (H - pad_px) y añade
           el espacio vacío al sur. El norte se preserva exactamente.
 
@@ -1233,7 +1236,9 @@ def make_south_room(img, metadata, lat_south, compress=False, n_idx=None):
     dpp = (top - bottom) / H  # grados por píxel
     pad_px = math.ceil((bottom - lat_south) / dpp)
 
-    if pad_px <= 0 or pad_px >= H:
+    # Comprimir necesita que quede alto para los datos; desplazar ya no, porque
+    # el crecimiento está acotado por la barra y no por pad_px.
+    if pad_px <= 0 or (compress and pad_px >= H):
         return img, metadata
 
     debug_msg(f"make_south_room: bottom={bottom:.4f}, lat_south={lat_south}, pad_px={pad_px}, compress={compress}")
@@ -1255,9 +1260,12 @@ def make_south_room(img, metadata, lat_south, compress=False, n_idx=None):
         new_bottom = lat_south
         new_H = H
     else:
-        # Del norte solo se cortan filas vacías; lo que falte se añade abajo
+        # Del norte solo se cortan filas vacías. Si no alcanzan, se crece lo
+        # justo para la barra: geotiff2view y mapdrawer la dibujan en las
+        # 2*(alto//20) filas de abajo, o sea que hace falta que las libres
+        # (recorte + crecer) sean al menos la décima parte de H + crecer.
         recorte = min(pad_px, _filas_vacias_al_norte(img, fill))
-        crecer = pad_px - recorte
+        crecer = min(pad_px - recorte, max(0, math.ceil((H - 10 * recorte) / 9)))
         if crecer:
             debug_msg(f"make_south_room: el norte tiene dato; se recortan {recorte} "
                       f"filas vacías y el lienzo crece {crecer} hacia el sur")
@@ -1265,7 +1273,7 @@ def make_south_room(img, metadata, lat_south, compress=False, n_idx=None):
         new_img = Image.new(img.mode, (W, new_H), fill)
         new_img.paste(img.crop((0, recorte, W, H)), (0, 0))
         new_top = top - recorte * dpp
-        new_bottom = bottom - pad_px * dpp  # ≈ lat_south
+        new_bottom = bottom - (recorte + crecer) * dpp  # ≈ lat_south si alcanzó
 
     metadata['bounds'] = (left, new_bottom, right, new_top)
 
