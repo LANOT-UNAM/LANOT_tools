@@ -88,18 +88,48 @@ Recomendación: **(a)**. Es la única que no pierde información, y el coste es
 un JSON de ~10 KB por cuadro que se purga con la misma regla que los PNG.
 Depende de la decisión de retención que sigue abierta en STAC_PLAN.md.
 
-**C-D2. ¿El JSON de la animación pasa a ser Item de STAC?** Recomendación: sí,
-porque es el que se conserva. Un Item por episodio, con:
-- `datetime: null`, `start_datetime`/`end_datetime` (inicio y fin del episodio);
-- activo `video` (`.webm`, `video/webm`, roles `["visual"]`) con la rejilla
-  de los cuadros (`proj:epsg: 3857`, `proj:transform`, `proj:shape`, `proj:bbox`);
-- `geometry`/`bbox` heredados del Item del primer cuadro;
-- `lanot:episodio` y `lanot:cuadros` con lo que hoy va en `episodio`/`cuadros`;
-- `links` `derived_from` a los Items de los cuadros, si C-D1 los conserva.
+**C-D2. El JSON de la animación pasa a ser Item de STAC — RESUELTA 2026-09-26.**
+Es el metadato que se conserva, así que es el Item que más importa en meso.
+Decisiones del usuario: **se construye en Python, con pruebas** (no en jq), y
+**el visor se adaptará más adelante, todavía no**, así que durante la
+transición el Item lleva también las claves planas que el visor lee.
 
-El id tiene que ser estable al crecer el episodio (hoy `animameso.sh` reescribe
-el mismo nombre mientras el episodio sigue vivo): usar el nombre de la
-animación, que ya lo es.
+Diseño del Item del episodio:
+- **id** = nombre de la animación (`20260908_0621_G18_m1`, el del primer
+  cuadro). Ya es estable mientras el episodio crece.
+- **Tiempo:** `datetime: null` con `start_datetime`/`end_datetime` = primer y
+  último cuadro (STAC exige el par cuando `datetime` es nulo).
+- **Huella:** `geometry`/`bbox` heredados del Item del primer cuadro. Es válido
+  porque un cambio de `bounds` ya cierra el episodio: todos los cuadros
+  comparten sector.
+- **Activo `video`:** `.webm`, `video/webm`, roles `["visual"]`, con su
+  **propia** rejilla. Trampa: ffmpeg lo reduce con `scale=-2:500`
+  (`animameso.sh`, `SCALE`), así que `proj:shape` y `proj:transform` **no** son
+  los de los cuadros. `proj:bbox` y `proj:epsg` (3857) sí se conservan; la
+  forma se lee del `.webm` con `ffprobe`, porque `-2` redondea el ancho a par y
+  calcularla daría un píxel de error.
+- **`properties["lanot:episodio"]`** y **`properties["lanot:cuadros"]`** con lo
+  que hoy va en `episodio` y `cuadros`; `lanot:tool: "animameso"`.
+- **Sin `links` a los Items de los cuadros**: los cuadros son intermedios que se
+  purgan, y en el archivo de `/depot` el enlace quedaría roto.
+- **Claves planas en la raíz durante la transición** —`bounds`, `crs`,
+  `satellite`, `band`, `timestamp`, `episodio`, `cuadros`— con los mismos
+  valores de hoy, porque las leen `views.py` y `crea_animaciones_meso.sh`. El
+  esquema del Item no las prohíbe. Se quitan cuando cada lector se adapte (C5).
+
+**Base del Item** (igual que hoy con el JSON plano): el Item anterior de la
+animación si existe; si no, el Item del primer cuadro. En un episodio largo el
+del primer cuadro puede haberse purgado. El Item del primer cuadro se encuentra
+por nombre, sin abrir otros: `20260908_0621_G18_m1.png` →
+`lanot_G18_m1_2026251_0621_*.json` (fecha juliana con `date -u -d … +%Y%j`, o
+en Python). Depende de C2 y C-D3.
+
+**C-D4. Trazabilidad a los L1b — ABIERTA.** El comentario de `animameso.sh` dice
+que el metadato debería permitir saber «de qué L1b salieron», pero hoy no lo
+registra, y el Item de hpsv tampoco trae los archivos de entrada. Opciones:
+lista de L1b en el Item del episodio, o referencia al registro de
+`catalogo/construye_catalogo_meso.py`. No bloquea C4; si se decide después, se
+añade al Item sin cambiar lo demás.
 
 **C-D3. ¿Cómo se llama el Item de cada cuadro en `$datadir`?** Hoy el plano es
 `YYYYMMDD_hhmm_SAT_SECTOR.json`; el Item, `lanot_<SAT>_<SECTOR>_<YYYYJJJ_hhmm>_<modo>.json`.
@@ -138,16 +168,32 @@ Item primero:
   `.assets.image["proj:bbox"]`, epoch = `.properties.datetime`, sector =
   `.properties["lanot:sector"]`, cuadro = `.assets.image.href`. Con respaldo al
   JSON plano mientras exista.
-- `views.py` (LANOT_pagina, despliegue aparte): `_bounds_a_leaflet()` acepta un
-  Item —`proj:bbox` y `proj:epsg` del activo `video`— o el formato actual.
-  Satélite: `properties.platform` (`goes-19` → `G19`, la misma conversión que
-  `Metadata.from_stac_item`); hora: `start_datetime` o `datetime`.
+- `views.py` (LANOT_pagina): **aplazado por decisión del usuario** (2026-09-26);
+  se adaptará más adelante. Mientras tanto sigue leyendo las claves planas, que
+  C4 conserva en la raíz. Cuando se haga: `_bounds_a_leaflet()` acepta un Item
+  —`proj:bbox` y `proj:epsg` del activo `video`—, satélite de
+  `properties.platform` (`goes-19` → `G19`, la misma conversión que
+  `Metadata.from_stac_item`), hora de `start_datetime`.
 
-**C4. `animameso.sh` escribe el Item del episodio** (según C-D2), tomando como
-base el Item del primer cuadro en vez del JSON plano. Mientras C3 no esté
-desplegado en el web, conservar además las claves planas en la raíz (`bounds`,
-`crs`, `satellite`, `band`, `timestamp`): el esquema del Item no las prohíbe.
-Quitarlas en C5.
+**C4. `animameso.sh` escribe el Item del episodio** (diseño en C-D2).
+- **LANOT_tools:** `stac_item.episode_item(base_item, webm_path, shape,
+  start, end, episodio, cuadros, flat)` que arma el Item, y una CLI pequeña
+  (entry point en `setup.py`, p. ej. `lanot-stac-episodio`) que `animameso.sh`
+  llama en lugar del `jq -n … $orig[0] + {…}` actual. Pruebas en
+  `tests/test_stac_item.py`: rejilla del video recalculada con otra forma
+  (`proj:bbox` igual, `proj:transform` escalado), `datetime` nulo con el par
+  inicio/fin, huella heredada, claves planas presentes con los valores de hoy,
+  base = Item anterior cuando el del primer cuadro no existe, y validación
+  contra los esquemas.
+- **`animameso.sh`:** obtiene el tamaño del `.webm` con `ffprobe`, busca la base
+  (Item anterior o del primer cuadro), llama la CLI y publica igual que hoy
+  (temporal `.parcial` y `mv` después del `.webm`).
+- **`crea_animaciones_meso.sh` en el mismo commit**, porque también lee el JSON
+  de la animación: en `:97` selecciona con `has("episodio") and has("cuadros")`
+  y en `:222` lee `.episodio.fin`. Con las claves planas conservadas en la raíz
+  sigue funcionando, pero conviene que lea ya `properties["lanot:episodio"]`
+  con respaldo a la raíz, para que C5 no lo rompa. Si se rompiera, dejaría de
+  reconocer las animaciones existentes y las rehace desde cero.
 
 **C5. Retirar el JSON plano.**
 - `mapdrawer --o_crs` deja de escribir `<imagen>.json` (`mapdrawer.py`, bloque
@@ -155,7 +201,9 @@ Quitarlas en C5.
 - `geotiff2view --save-metadata`: ningún guion la usa (verificado 2026-09-26;
   sólo `tests/test_geotiff2view.py:106`). Quitarla o hacerla alias de `--stac`.
 - `Metadata.from_json_file()`/`save_json()`: borrar si ya nadie los llama.
-- Quitar los respaldos al formato plano de C3 y las claves planas de C4.
+- Quitar los respaldos al formato plano de C3 y las claves planas de C4. Las
+  que lee el visor (`bounds`, `crs`, `satellite`, `band`, `timestamp`) sólo
+  cuando `views.py` esté adaptado y desplegado.
 - Actualizar `CLAUDE.md` («Metadata JSON = STAC Item», «Emitting STAC») y el README.
 
 **C6. Polares (independiente de meso).** `crea_vistas_viirs.sh` y
@@ -174,8 +222,11 @@ el crontab.
   a una copia de un día real, leyendo sólo Items, y comparar con `diff` la lista
   de episodios contra la que sale leyendo el plano. Tienen que ser idénticas.
 - C4: el Item del episodio valida contra los esquemas oficiales (reusar el
-  validador de `tests/test_stac_item.py`), y el visor coloca el video en el
-  mismo sitio que antes.
+  validador de `tests/test_stac_item.py`); sus claves planas son idénticas a las
+  del JSON que se escribía antes (`diff` con `jq -S` de las claves de la raíz);
+  el visor coloca el video en el mismo sitio que antes; y
+  `crea_animaciones_meso.sh` sigue extendiendo las animaciones vivas en vez de
+  crear otras.
 - C5: `grep -rn "\.bounds\|save-metadata\|save_json\|from_json_file"` en
   LANOT_tools, LANOT_procesamiento_goes y LANOT_pagina no encuentra lectores
   vivos.
@@ -196,8 +247,11 @@ Lista única de lo que queda. El detalle de la fase C está arriba.
   queda», punto 2). Bloquea C-D1 y C6.
 - [ ] **C-D1**: qué pasa con el Item de hpsv que hoy se borra con el directorio
   temporal de `crea_rgb_meso.py`. Recomendado: copiarlo junto a la vista.
-- [ ] **C-D2**: el JSON de la animación pasa a ser Item de STAC por episodio.
-  Recomendado: sí.
+- [x] **C-D2** (2026-09-26): el JSON de la animación pasa a ser Item de STAC
+  por episodio, construido en Python con pruebas. El visor se adapta más
+  adelante; mientras, el Item conserva las claves planas en la raíz.
+- [ ] **C-D4**: trazabilidad a los L1b en el Item del episodio (lista de L1b o
+  referencia al catálogo de `construye_catalogo_meso.py`). No bloquea C4.
 - [ ] **C-D3**: los Items de cuadro se nombran por id y los lectores toman
   imagen, instante y sector del contenido. Recomendado: sí.
 - [ ] Aprobar el orden C1 → C6 (lectores tolerantes, luego escritores, luego
@@ -212,10 +266,13 @@ Lista única de lo que queda. El detalle de la fase C está arriba.
 - [ ] **C2** Averiguar en tren2 qué purga los cuadros de `$datadir` (no está en
   `cron/mesoescala.cron` ni en los guiones versionados) y que abarque
   `lanot_*.json`.
-- [ ] **C3** Lectores tolerantes: `crea_animaciones_meso.sh` y `views.py` de
-  LANOT_pagina (despliegue aparte).
-- [ ] **C4** `animameso.sh` escribe el Item del episodio, con las claves planas
-  en la raíz mientras el visor no tenga C3.
+- [ ] **C3** Lector tolerante en `crea_animaciones_meso.sh` (Items de cuadro).
+- [ ] **C3, aplazado** `views.py` de LANOT_pagina: se adapta más adelante, por
+  decisión del usuario. Hasta entonces las claves planas de la raíz se quedan.
+- [ ] **C4** `stac_item.episode_item()` + CLI + pruebas en LANOT_tools;
+  `animameso.sh` la llama (tamaño del video con `ffprobe`); y en el mismo
+  commit `crea_animaciones_meso.sh:97` y `:222` leen `lanot:episodio` con
+  respaldo a la raíz.
 - [ ] **C5** Retirar el JSON plano de `--o_crs`, `--save-metadata`,
   `Metadata.from_json_file()`/`save_json()` y los respaldos de C3/C4; actualizar
   `CLAUDE.md` y README.
