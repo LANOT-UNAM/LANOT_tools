@@ -315,9 +315,10 @@ class SkewT:
                        f'{self._xy(self.tmax, y)} }}')
             # El nombre va DENTRO de la caja: el rótulo de un `rule` cae sobre el
             # eje, donde ya están los hectopascales, y se pisarían.
+            at = self._xy(self.tmin + 0.02 * (self.tmax - self.tmin),
+                          y + 0.012 * self.ymax)
             out.append(f'  text("{name} {p:.0f}", align="left", size={self.font_size - 1}) '
-                       f'{{ {self._xy(self.tmin + 0.02 * (self.tmax - self.tmin),
-                                      y + 0.012 * self.ymax)} }}')
+                       f'{{ {at} }}')
         return p_lcl, p_lfc, p_el
 
     def _header(self, out, snd, title):
