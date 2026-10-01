@@ -66,14 +66,26 @@ STYLE = {
     'surface':    ('saddlebrown', 0.6, None),
 }
 
+# Error de redondeo tolerable EN EL PAPEL, en cm. Las coordenadas del plot se
+# emiten con los decimales que hacen falta para no pasar de esto en cada eje: el
+# plot es muy anisótropo (~40x entre °C y log p con el papel por omisión), así que
+# unos mismos decimales en los dos sobran en x y faltan en y.
+TOL_CM = 0.001
+
 
 def _fmt(v, dec=3):
     return f"{v:.{dec}f}"
 
 
+def _decimals(cm_per_unit, tol_cm=TOL_CM):
+    """Decimales para que medio escalón de redondeo no pase de `tol_cm` en papel."""
+    return max(0, math.ceil(math.log10(0.5 * cm_per_unit / tol_cm)))
+
+
 def _has_extent(seg, tol=1e-6):
-    """True si el tramo mide algo. La tolerancia va en unidades de datos (°C y
-    log p), muy por debajo de los tres decimales con que se emite."""
+    """True si el tramo mide algo, en unidades de datos (°C y log p). No basta
+    para la emisión: un tramo así puede redondear a puntos idénticos, y eso lo
+    filtra `_polys` sobre las cadenas ya formateadas."""
     return any(abs(b[0] - a[0]) > tol or abs(b[1] - a[1]) > tol
                for a, b in zip(seg, seg[1:]))
 
@@ -103,6 +115,8 @@ class SkewT:
         # Sale de igualar dx_pagina/dy_pagina = tan(skew) con el mapeo del plot.
         self.m = (math.tan(math.radians(skew)) * (self.tmax - self.tmin) * bh
                   / (self.ymax * bw))
+        self.dec_x = _decimals(bw / (self.tmax - self.tmin))
+        self.dec_y = _decimals(bh / self.ymax)
 
         # Rejilla en p, uniforme en log: es la que hace que una curva calculada se
         # vea suave en el diagrama, que es donde se mira.
@@ -168,15 +182,43 @@ class SkewT:
         return list(zip(np.asarray(self.x_of(T_C, p), dtype=float).ravel(),
                         np.asarray(self.y_of(p), dtype=float).ravel()))
 
+    def isotherm(self, t):
+        """La isoterma `t` ya recortada: dos puntos, o [] si no cruza la caja.
+
+        Es la recta x = t + m·y, así que el recorte es exacto y analítico. No se
+        le pasa a `clip`: con el sesgo, una isoterma puede entrar por la izquierda
+        y salir por la derecha con los dos extremos fuera, y `clip` solo ve las
+        transiciones dentro/fuera de cada tramo.
+        """
+        lo, hi = 0.0, self.ymax
+        if self.m > 0:
+            lo = max(lo, (self.tmin - t) / self.m)
+            hi = min(hi, (self.tmax - t) / self.m)
+        elif not (self.tmin <= t <= self.tmax):
+            return []
+        if hi - lo <= 1e-6:
+            return []
+        # Acotar a la caja: el redondeo de la división puede dejar el extremo a un
+        # 1e-15 del borde por fuera.
+        return [(min(max(t + self.m * y, self.tmin), self.tmax), y) for y in (lo, hi)]
+
     # --- emisión -----------------------------------------------------------
-    def _polys(self, out, key, curves):
+    def _xy(self, x, y):
+        """Un par de coordenadas del plot, con los decimales de cada eje."""
+        return f"{x:.{self.dec_x}f} {y:.{self.dec_y}f}"
+
+    def _polys(self, out, key, curves, clip=True):
         color, lw, dash = STYLE[key]
         out.append(f'  color "{color}"  line_width {lw}'
                    + (f'  dash "{dash}"' if dash else '  dash "solid"'))
         for pts in curves:
-            for seg in self.clip(pts):
-                body = "  ".join(f"{_fmt(x)} {_fmt(y)}" for x, y in seg)
-                out.append(f"  polyline {{ {body} }}")
+            for seg in (self.clip(pts) if clip else [pts]):
+                # Quitar los puntos consecutivos que redondean igual: un tramo con
+                # extensión en datos puede no tenerla con los decimales emitidos.
+                xy = [self._xy(x, y) for x, y in seg]
+                xy = [c for i, c in enumerate(xy) if i == 0 or c != xy[i - 1]]
+                if len(xy) > 1:
+                    out.append(f"  polyline {{ {'  '.join(xy)} }}")
 
     def _background(self, out):
         out.append("\n  % isotermas")
@@ -185,8 +227,9 @@ class SkewT:
         t0 = int(self.tmin - self.m * self.ymax) - ISOTHERM_STEP
         t1 = int(self.tmax) + ISOTHERM_STEP
         self._polys(out, 'isotherm',
-                    [self.curve(np.full(self.p_grid.shape, t), self.p_grid)
-                     for t in range(t0, t1 + 1, ISOTHERM_STEP)])
+                    [s for s in (self.isotherm(t)
+                                 for t in range(t0, t1 + 1, ISOTHERM_STEP)) if s],
+                    clip=False)
 
         out.append("\n  % adiabáticas secas (θ constante)")
         self._polys(out, 'dry',
@@ -210,7 +253,7 @@ class SkewT:
         out.append(f'  color "{color}"  line_width {lw}  dash "solid"')
         for p in (1000, 850, 700, 500, 400, 300, 250, 200, 150, 100):
             if self.pmin <= p <= self.pmax:
-                out.append(f'  rule(y={_fmt(float(self.y_of(p)), 4)}, '
+                out.append(f'  rule(y={_fmt(float(self.y_of(p)), self.dec_y)}, '
                            f'label="{p}", label_at="axis")')
 
     def _profile(self, out, snd):
@@ -234,7 +277,7 @@ class SkewT:
         color, lw, _ = STYLE['surface']
         out.append("\n  % superficie (nivel de NUCAPS, aparte del perfil)")
         out.append(f'  color "{color}"  line_width {lw}  dash "solid"')
-        out.append(f'  rule(y={_fmt(y, 4)}, label="Sup. {p_s:.0f}", label_at="axis")')
+        out.append(f'  rule(y={_fmt(y, self.dec_y)}, label="Sup. {p_s:.0f}", label_at="axis")')
         for key, val in (('temp', getattr(snd, 'surface_T', np.nan)),
                          ('dewpoint', getattr(snd, 'surface_Td', np.nan))):
             if not np.isfinite(val):
@@ -245,7 +288,7 @@ class SkewT:
                 # sentencia `color`, sale negro.
                 c = STYLE[key][0]
                 out.append(f'  marker(3, shape="circle", color="{c}", fill="{c}") '
-                           f'{{ {_fmt(x)} {_fmt(yy, 4)} }}')
+                           f'{{ {self._xy(x, yy)} }}')
         return True
 
     def _parcel(self, out, snd):
@@ -268,13 +311,13 @@ class SkewT:
             if not (np.isfinite(p) and self.pmin <= p <= self.pmax):
                 continue
             y = float(self.y_of(p))
-            out.append(f'  polyline {{ {_fmt(self.tmin)} {_fmt(y, 4)}  '
-                       f'{_fmt(self.tmax)} {_fmt(y, 4)} }}')
+            out.append(f'  polyline {{ {self._xy(self.tmin, y)}  '
+                       f'{self._xy(self.tmax, y)} }}')
             # El nombre va DENTRO de la caja: el rótulo de un `rule` cae sobre el
             # eje, donde ya están los hectopascales, y se pisarían.
             out.append(f'  text("{name} {p:.0f}", align="left", size={self.font_size - 1}) '
-                       f'{{ {_fmt(self.tmin + 0.02 * (self.tmax - self.tmin))} '
-                       f'{_fmt(y + 0.012 * self.ymax, 4)} }}')
+                       f'{{ {self._xy(self.tmin + 0.02 * (self.tmax - self.tmin),
+                                      y + 0.012 * self.ymax)} }}')
         return p_lcl, p_lfc, p_el
 
     def _header(self, out, snd, title):
@@ -387,7 +430,7 @@ class SkewT:
             # ancho por omisión, 1 pt en vez de 0.4.
             "line_width 0.4",
             f"plot(x=({_fmt(self.tmin, 1)},{_fmt(self.tmax, 1)}), "
-            f"y=(0,{_fmt(self.ymax, 4)}), "
+            f"y=(0,{_fmt(self.ymax, self.dec_y)}), "
             f"box=({_fmt(bx0, 2)},{_fmt(by0, 2)}, {_fmt(bx1, 2)},{_fmt(by1, 2)}), "
             f"frame=true) {{",
         ]

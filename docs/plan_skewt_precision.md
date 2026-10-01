@@ -1,6 +1,6 @@
 # Skew-T: precisión por eje e isotermas de 2 puntos
 
-Escrito el 2026-10-01. **Propuesto, sin implementar.** Sale de una sesión en el
+Escrito el 2026-10-01. **Hecho el 2026-10-01** (ver "Resultado" al final). Sale de una sesión en el
 repo de MetaGráfica: al meter `examples/skewt_golfo.mg` (una instantánea de lo que
 emite `skewt.py`) al corpus hubo que decimarlo a mano con
 `tools/simplifica_mg.py --escala` (commit 8a281f9 de MetaGráfica, ver las NOTAS de
@@ -83,6 +83,13 @@ vacío. La primera es una línea y reutiliza código ya probado — preferirla.
 
 Esperado: 508 → 36 puntos en isotermas; mismas 18 polilíneas.
 
+> **Corrección al implementar:** la opción "preferida" de arriba pierde
+> isotermas. `clip` solo mira transiciones dentro↔fuera de cada tramo, y con el
+> sesgo (m·ymax ≈ 95 °C > 80 °C de ancho) una isoterma como −50 °C entra por la
+> izquierda y sale por la derecha con **los dos extremos fuera**: el tramo único
+> se descarta. Se implementó la analítica, `SkewT.isotherm(t)`, que no pasa por
+> `clip`.
+
 ## Pruebas nuevas (`tests/test_skewt.py`)
 
 - **`test_ninguna_isoterma_tiene_mas_de_2_puntos`**: partir el `render` entre
@@ -129,3 +136,24 @@ mg golfo.mg golfo.pdf                  # comparar a ojo con la de antes, con zoo
 
 Al terminar: actualizar el conteo de pruebas en `CLAUDE.md` y marcar este plan
 como hecho.
+
+## Resultado (2026-10-01)
+
+Con el bloque de medida de arriba, papel por omisión:
+
+| | antes | después |
+|---|---|---|
+| `.mg` emitido | 35 999 bytes | **29 264 bytes** (−19 %) |
+| isotermas | 18 polilíneas, 508 puntos | 18 polilíneas, **36 puntos** |
+| decimales x / y | 3 / 3 | **2 / 4** (de `TOL_CM`) |
+
+Mismo número de isotermas y mismos extremos (±1 en el último decimal) que la
+versión anterior con 16x20, 10x12, `--pmin 200` y `--skew 0`. Comparado en PDF
+rasterizado a 300 dpi: solo cambia el antialiasing subpíxel a lo largo de las
+líneas.
+
+Implementado como: `TOL_CM` y `_decimals()` de módulo; `self.dec_x`/`dec_y` en
+`__init__`; `SkewT.isotherm()` (recorte analítico, acotado a la caja);
+`SkewT._xy()`; `_polys(..., clip=True)` quita los puntos consecutivos que
+redondean igual y descarta la polilínea si queda de uno. 14 pruebas nuevas en
+`tests/test_skewt.py` (sección "precisión de lo emitido").

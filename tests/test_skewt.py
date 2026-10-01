@@ -224,6 +224,87 @@ def test_el_mg_emitido_compila(diag, tmp_path, ext):
     assert 'Error' not in r.stderr, r.stderr
 
 
+# --- precisión de lo emitido -------------------------------------------------
+
+def _polylines(src, desde=None, hasta=None):
+    """Las polilíneas del fuente como listas de pares-cadena "x y"."""
+    if desde:
+        src = src.split(desde)[1].split(hasta)[0]
+    out = []
+    for l in src.splitlines():
+        if 'polyline' in l:
+            v = l.split('{')[1].split('}')[0].split()
+            out.append([f"{a} {b}" for a, b in zip(v[::2], v[1::2])])
+    return out
+
+
+def _isotermas(d):
+    return _polylines(d.render(_sondeo_sintetico(), "Prueba"),
+                      "% isotermas", "% adiabáticas")
+
+
+def test_ninguna_isoterma_tiene_mas_de_2_puntos(diag):
+    """Son rectas exactas: muestrearlas con la rejilla en p solo engordaba el .mg."""
+    assert all(len(pl) == 2 for pl in _isotermas(diag))
+
+
+@pytest.mark.parametrize("kw, n", [({}, 18), ({'width': 10, 'height': 12}, 17),
+                                   ({'pmin': 200}, 18), ({'skew': 0.0}, 9)])
+def test_las_isotermas_no_cambian_de_numero(kw, n):
+    """Las que se veían con la rejilla de 61 niveles, ni una menos: con el sesgo
+    hay isotermas que entran por la izquierda y salen por la derecha con los dos
+    extremos fuera de la caja, y un recorte por tramos las perdería."""
+    assert len(_isotermas(skewt.SkewT(**kw))) == n
+
+
+def test_isoterma_recortada_sobre_el_borde(diag):
+    for t in range(-150, 50, 10):
+        for x, y in diag.isotherm(t):
+            assert diag.inside(x, y)
+            assert x == pytest.approx(t + diag.m * y, abs=1e-9)
+
+
+@pytest.mark.parametrize("kw", [{}, {'width': 10, 'height': 12},
+                                {'width': 30, 'height': 40}, {'pmin': 250},
+                                {'tmin': -20, 'tmax': 50}])
+def test_error_de_redondeo_en_papel(kw):
+    """Medio escalón del último decimal, en cm de página, no pasa de TOL_CM en
+    ningún eje. Tres decimales fijos daban 0.067 mm en y con el papel por omisión."""
+    d = skewt.SkewT(**kw)
+    bw, bh = d.box[2] - d.box[0], d.box[3] - d.box[1]
+    assert 0.5 * 10 ** -d.dec_x * bw / (d.tmax - d.tmin) <= skewt.TOL_CM
+    assert 0.5 * 10 ** -d.dec_y * bh / d.ymax <= skewt.TOL_CM
+    # Y sin derrochar: un decimal menos ya pasaría de la tolerancia.
+    assert 0.5 * 10 ** -(d.dec_y - 1) * bh / d.ymax > skewt.TOL_CM
+
+
+def test_cada_eje_lleva_sus_decimales(diag):
+    # Las muestras de la leyenda van en unidades de la muestra, no del plot.
+    src = diag.render(_sondeo_sintetico(), "Prueba").split("% leyenda")[0]
+    for pl in _polylines(src):
+        for par in pl:
+            x, y = par.split()
+            assert len(x.split('.')[1]) == diag.dec_x, par
+            assert len(y.split('.')[1]) == diag.dec_y, par
+
+
+def test_ningun_punto_repetido_tras_redondear(diag):
+    """La extensión en datos no basta: con dos decimales en x un tramo de 0.003 °C
+    y Δy = 0 se emitiría como dos puntos idénticos, el bug de la esquina otra vez."""
+    for pl in _polylines(diag.render(_sondeo_sintetico(), "Prueba")):
+        assert len(pl) > 1, pl
+        assert all(a != b for a, b in zip(pl, pl[1:])), pl
+
+
+def test_los_puntos_que_redondean_igual_se_quitan(diag):
+    out = []
+    diag._polys(out, 'temp', [[(0.0, 0.5), (0.001, 0.5), (0.002, 0.5)]], clip=False)
+    assert not any('polyline' in l for l in out)
+    out = []
+    diag._polys(out, 'temp', [[(0.0, 0.5), (0.001, 0.5), (1.0, 0.5)]], clip=False)
+    assert _polylines("\n".join(out)) == [["0.00 0.5000", "1.00 0.5000"]]
+
+
 # --- superficie ---------------------------------------------------------------
 
 def test_la_superficie_se_marca_aparte(diag):
