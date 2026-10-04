@@ -759,7 +759,9 @@ def main():
             print("Advertencia: El formato JPEG no soporta transparencia (-a). Se ignorará.", file=sys.stderr)
         img = img.convert('RGB')
 
-    img.save(output_path)
+    # zlib nivel 1 (el de hpsv): ~3x más rápido que el 6 por defecto de
+    # Pillow, ~12 % más grande. Pillow lo ignora en JPEG.
+    img.save(output_path, compress_level=1)
     print(f"Guardado en {output_path}")
 
     # Item de STAC (--stac). La rejilla es la del GeoTIFF salvo con --clip,

@@ -470,6 +470,70 @@ class MapDrawer:
             v = int(h * (b['uly'] - lat) / height_span)
             return u, v
 
+    def _geo2pixel_array(self, lons, lats):
+        """_geo2pixel() sobre arrays: una sola llamada a pyproj por trazo.
+
+        Devuelve (u, v, ok), con ok=False donde _geo2pixel() devolvería None.
+        Mismas operaciones en float64 y truncamiento hacia cero que int(),
+        así que los píxeles coinciden con los de la versión punto por punto.
+        """
+        w = self.image.width
+        h = self.image.height
+        zeros = np.zeros(len(lons), dtype=np.int64)
+
+        if self.use_proj:
+            x_p, y_p = self.transformer.transform(lons, lats)
+            x_p = np.asarray(x_p, dtype=np.float64)
+            y_p = np.asarray(y_p, dtype=np.float64)
+            ok = np.isfinite(x_p) & np.isfinite(y_p)
+            pb = self.proj_bounds
+            if pb['width'] == 0 or pb['height'] == 0:
+                return zeros, zeros, ok
+            with np.errstate(invalid='ignore'):
+                u = np.where(ok, w * (x_p - pb['min_x']) / pb['width'], 0)
+                v = np.where(ok, h * (y_p - pb['max_y']) / pb['height'], 0)
+            return u.astype(np.int64), v.astype(np.int64), ok
+
+        ok = np.ones(len(lons), dtype=bool)
+        b = self.bounds
+        width_span = b['lrx'] - b['ulx']
+        height_span = b['uly'] - b['lry']
+        if width_span == 0 or height_span == 0:
+            return zeros, zeros, ok
+        u = w * (lons - b['ulx']) / width_span
+        v = h * (b['uly'] - lats) / height_span
+        return u.astype(np.int64), v.astype(np.int64), ok
+
+    def _draw_path(self, draw, coords, color, line_width, margin=5.0):
+        """Dibuja una polilínea lon/lat, cortándola donde sale del recuadro
+        (con margen) o la proyección no es finita; tramos de < 2 puntos se omiten.
+        """
+        if len(coords) < 2:
+            return
+        pts = np.asarray(coords, dtype=np.float64)[:, :2]
+        lons, lats = pts[:, 0], pts[:, 1]
+        b = self.bounds
+        inside = ((b['ulx'] - margin < lons) & (lons < b['lrx'] + margin) &
+                  (b['lry'] - margin < lats) & (lats < b['uly'] + margin))
+        if inside.sum() < 2:
+            return
+
+        idx = np.flatnonzero(inside)
+        u, v, ok = self._geo2pixel_array(lons[idx], lats[idx])
+        valid = np.zeros(len(lons), dtype=bool)
+        valid[idx[ok]] = True
+        uv = np.zeros((len(lons), 2), dtype=np.int64)
+        uv[idx, 0] = u
+        uv[idx, 1] = v
+
+        # Tramos consecutivos de puntos válidos
+        edges = np.diff(np.concatenate(([0], valid.view(np.int8), [0])))
+        starts = np.flatnonzero(edges == 1)
+        ends = np.flatnonzero(edges == -1)
+        for s, e in zip(starts, ends):
+            if e - s >= 2:
+                draw.line(uv[s:e].ravel().tolist(), fill=color, width=line_width)
+
     def crop(self, ulx, uly, lrx, lry):
         """Recorta la imagen a los límites geográficos especificados."""
         if self.image is None:
@@ -561,96 +625,30 @@ class MapDrawer:
         draw = ImageDraw.Draw(self.image)
         debug_msg(f"Procesando {len(features)} geometrías...")
 
-        b = self.bounds
-        margin = 5.0
+        line_width = max(1, int(width))
 
         for feature in features:
             geom = feature['geometry']
             if not geom:
                 continue
 
-            # Obtener bbox de la geometría si existe
-            # Fiona usa bounds en feature, pero no siempre está disponible
-            # Mejor procesar las coordenadas directamente
-
             geom_type = geom['type']
             coords = geom['coordinates']
 
-            # Manejar diferentes tipos de geometría
-            if geom_type in ['LineString', 'MultiLineString']:
-                # Convertir a lista de LineStrings
-                if geom_type == 'LineString':
-                    linestrings = [coords]
-                else:  # MultiLineString
-                    linestrings = coords
+            if geom_type == 'LineString':
+                paths = [coords]
+            elif geom_type == 'MultiLineString':
+                paths = coords
+            elif geom_type == 'Polygon':
+                # Todos los anillos: el exterior y los huecos
+                paths = coords
+            elif geom_type == 'MultiPolygon':
+                paths = [ring for polygon in coords for ring in polygon]
+            else:
+                continue
 
-                for linestring in linestrings:
-                    if not linestring:
-                        continue
-
-                    pixel_coords = []
-
-                    for lon, lat in linestring:
-                        # Clipping suave
-                        if (b['ulx'] - margin < lon < b['lrx'] + margin and
-                                b['lry'] - margin < lat < b['uly'] + margin):
-
-                            res = self._geo2pixel(lon, lat)
-                            if res is None:
-                                if len(pixel_coords) >= 4:
-                                    draw.line(pixel_coords, fill=color,
-                                              width=max(1, int(width)))
-                                pixel_coords = []
-                                continue
-
-                            u, v = res
-                            pixel_coords.extend((u, v))
-                        else:
-                            if len(pixel_coords) >= 4:
-                                draw.line(pixel_coords, fill=color,
-                                          width=max(1, int(width)))
-                            pixel_coords = []
-
-                    # Dibujar remanente
-                    if len(pixel_coords) >= 4:
-                        draw.line(pixel_coords, fill=color,
-                                  width=max(1, int(width)))
-
-            elif geom_type in ['Polygon', 'MultiPolygon']:
-                # Para polígonos, dibujar solo los bordes (anillos exteriores)
-                if geom_type == 'Polygon':
-                    polygons = [coords]
-                else:  # MultiPolygon
-                    polygons = coords
-
-                for polygon in polygons:
-                    # polygon[0] es el anillo exterior, polygon[1:] son huecos
-                    for ring in polygon:
-                        pixel_coords = []
-
-                        for lon, lat in ring:
-                            if (b['ulx'] - margin < lon < b['lrx'] + margin and
-                                    b['lry'] - margin < lat < b['uly'] + margin):
-
-                                res = self._geo2pixel(lon, lat)
-                                if res is None:
-                                    if len(pixel_coords) >= 4:
-                                        draw.line(pixel_coords, fill=color,
-                                                  width=max(1, int(width)))
-                                    pixel_coords = []
-                                    continue
-
-                                u, v = res
-                                pixel_coords.extend((u, v))
-                            else:
-                                if len(pixel_coords) >= 4:
-                                    draw.line(pixel_coords, fill=color,
-                                              width=max(1, int(width)))
-                                pixel_coords = []
-
-                        if len(pixel_coords) >= 4:
-                            draw.line(pixel_coords, fill=color,
-                                      width=max(1, int(width)))
+            for path in paths:
+                self._draw_path(draw, path, color, line_width)
 
     # --- Nueva API basada en nombres de capa ---
     def add_layer(self, key, rel_path):
@@ -1909,7 +1907,9 @@ def main():
                     dst.colorinterp = color_interps
             print(f"GeoTIFF guardado en {output_path}")
         else:
-            img.save(output_path)
+            # zlib nivel 1 (el de hpsv): ~3x más rápido que el 6 por defecto
+            # de Pillow, ~12 % más grande. Pillow lo ignora en JPEG.
+            img.save(output_path, compress_level=1)
             print(f"Imagen guardada en {output_path}")
             # Sidecar JSON cuando se usó --o_crs y la salida no es GeoTIFF
             if o_crs_used and metadata:
