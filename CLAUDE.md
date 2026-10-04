@@ -42,7 +42,7 @@ sudo /opt/lanot-tools/venv/bin/pip install pytest
 /opt/lanot-tools/venv/bin/python -m pytest tests/
 ```
 
-Expected on a healthy checkout: **368 passed, 0 skipped** (+5 de `LazyGeoTIFF` el 2026-10-04, verificadas sin `test_stac_item.py`: 348 passed; 323 medidas el 2026-09-26 con `python3` del sistema, que trae pytest, jsonschema y las dependencias de ejecución, tras añadir `--stac`; +14 de la precisión del Skew-T y +26 de `test_sintaxis_py39.py` el 2026-10-01, verificadas sin `test_stac_item.py`: 342 passed). Conteos anteriores —323 el 2026-09-26, 265 el 2026-09-12, 224 el 2026-08-30; 114 passed, 33 skipped antes— ya no aplican: aquellos saltos eran por datos de muestra ausentes, no por dependencias. `tests/test_stac_item.py` necesita además `jsonschema` (con `referencing`), que tampoco está en el venv del servidor.
+Expected on a healthy checkout: **371 passed, 0 skipped** (+5 de `LazyGeoTIFF` y +3 de `LANOT_DIR` el 2026-10-04, verificadas sin `test_stac_item.py`: 351 passed; 323 medidas el 2026-09-26 con `python3` del sistema, que trae pytest, jsonschema y las dependencias de ejecución, tras añadir `--stac`; +14 de la precisión del Skew-T y +26 de `test_sintaxis_py39.py` el 2026-10-01, verificadas sin `test_stac_item.py`: 342 passed). Conteos anteriores —323 el 2026-09-26, 265 el 2026-09-12, 224 el 2026-08-30; 114 passed, 33 skipped antes— ya no aplican: aquellos saltos eran por datos de muestra ausentes, no por dependencias. `tests/test_stac_item.py` necesita además `jsonschema` (con `referencing`), que tampoco está en el venv del servidor.
 
 El contenedor de polar2grid corre **Python 3.9**. `tests/test_sintaxis_py39.py` rechaza los f-strings que solo valen desde 3.12 (salto de línea dentro de `{…}`, comillas iguales anidadas): con un intérprete moderno compilan y pasan todo, y en el `.sif` son un `SyntaxError` al importar.
 
@@ -95,6 +95,8 @@ The system has three CLI entry points and seven importable library modules:
 - Vector layers: `/usr/local/share/lanot/gpkg/`
 - Logos: `/usr/local/share/lanot/logos/`
 - Predefined regions (conus, fulldisk, etc.): `docs/recortes_coordenadas.csv` relative to install
+
+`LANOT_DIR` (env) replaces `/usr/local/share/lanot` in `mapdrawer`, `geotiff2view` and `skewt`'s logo search; empty counts as unset. These resources are **not** in the repo and `install.sh` does not copy the gpkg: they are placed by hand on each machine, so they can drift between servers. `mexico_estados.gpkg` was simplified to 0.001° on 2026-10-04 (1 M → 63 k vertices, ≤ 1 px shift at 0.5 km); the INEGI original stays beside it as `mexico_estados_original.gpkg`.
 
 ### Operational Scripts
 - **`crea_vistas_viirs.sh`** — Batch processes recent VIIRS products (CLAVRX, ACSPO, Fire) using `geotiff2view`. Selects CPT by filename pattern and writes JPEG to `/var/www/html/polar/jpss/viirs/`.

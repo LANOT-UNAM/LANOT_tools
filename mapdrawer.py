@@ -164,8 +164,9 @@ GOES_CONUS_EXTENT_METERS = {
     'height': -3006025.93
 }
 
-# Directorio global de recursos (instalación estándar)
-GLOBAL_LANOT_DIR = "/usr/local/share/lanot"
+# Directorio global de recursos (instalación estándar). LANOT_DIR lo
+# sustituye, p.ej. para probar un gpkg o un logo sin tocar lo instalado.
+GLOBAL_LANOT_DIR = os.environ.get("LANOT_DIR") or "/usr/local/share/lanot"
 
 
 class LazyGeoTIFF:

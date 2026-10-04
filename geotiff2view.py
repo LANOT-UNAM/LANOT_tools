@@ -50,8 +50,10 @@ except ImportError:
 
 VERBOSE = False
 
-# Directorio global de paletas (instalación estándar)
-GLOBAL_CPT_DIR = "/usr/local/share/lanot/colortables"
+# Directorio global de paletas (instalación estándar). LANOT_DIR sustituye
+# a /usr/local/share/lanot, igual que en mapdrawer.
+GLOBAL_CPT_DIR = os.path.join(os.environ.get("LANOT_DIR") or "/usr/local/share/lanot",
+                              "colortables")
 
 # Código de salida para "el GeoTIFF no tiene un solo píxel válido, no escribí
 # nada". No es un fallo: hay productos que legítimamente salen vacíos en una

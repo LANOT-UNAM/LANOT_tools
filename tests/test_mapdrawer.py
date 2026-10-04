@@ -612,3 +612,46 @@ class TestLazyGeoTIFF:
         b = np.array(Image.open(tmp_path / 'imgpng.png'))
         assert a.shape == (30, 40, 3)
         assert np.array_equal(a, b)
+
+
+# ---------------------------------------------------------------------------
+# LANOT_DIR sustituye a /usr/local/share/lanot
+# ---------------------------------------------------------------------------
+
+REPO = os.path.join(os.path.dirname(__file__), '..')
+
+
+def _resource_dir(module, attr, lanot_dir):
+    """Valor de module.attr importado con LANOT_DIR=lanot_dir (None: sin ella)."""
+    env = {k: v for k, v in os.environ.items() if k != 'LANOT_DIR'}
+    if lanot_dir is not None:
+        env['LANOT_DIR'] = lanot_dir
+    r = subprocess.run(
+        [sys.executable, '-c', f'import {module}; print({module}.{attr})'],
+        cwd=REPO, env=env, capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0, r.stderr
+    return r.stdout.strip()
+
+
+class TestLanotDir:
+    @pytest.mark.parametrize('module, attr, suffix', [
+        ('mapdrawer', 'GLOBAL_LANOT_DIR', ''),
+        ('geotiff2view', 'GLOBAL_CPT_DIR', '/colortables'),
+    ])
+    def test_env_and_default(self, tmp_path, module, attr, suffix):
+        assert _resource_dir(module, attr, str(tmp_path)) == str(tmp_path) + suffix
+        default = '/usr/local/share/lanot' + suffix
+        assert _resource_dir(module, attr, None) == default
+        # Vacía cuenta como no definida: no buscar recursos en el cwd
+        assert _resource_dir(module, attr, '') == default
+
+    def test_layers_read_from_lanot_dir(self, tmp_path):
+        img = tmp_path / 'img.png'
+        _solid_image().save(img)
+        env = dict(os.environ, LANOT_DIR=str(tmp_path / 'recursos'))
+        r = subprocess.run(
+            [sys.executable, MAPDRAWER, str(img), '--bounds=-120,40,-80,10',
+             '--layer', 'MEXSTATES:white:1', '-o', str(tmp_path / 'out.png')],
+            env=env, capture_output=True, text=True, timeout=120)
+        expected = os.path.join(str(tmp_path / 'recursos'), 'gpkg', 'mexico_estados.gpkg')
+        assert expected in r.stdout + r.stderr

@@ -382,6 +382,17 @@ Después de la instalación se crean:
 - Logos: `/usr/local/share/lanot/logos/`
 - Recortes: `/usr/local/share/lanot/docs/recortes_coordenadas.csv`
 
+La variable de entorno `LANOT_DIR` sustituye a `/usr/local/share/lanot` en
+`mapdrawer`, `geotiff2view` y `skewt`, p. ej. para probar un gpkg o un logo nuevo
+sin tocar lo instalado:
+
+```bash
+LANOT_DIR=$HOME/lanot_prueba mapdrawer img.tif --layer MEXSTATES:white:1
+```
+
+`mexico_estados.gpkg` está simplificado a 0.001° (~110 m) desde 2026-10-04; el
+original de INEGI se conserva como `mexico_estados_original.gpkg`.
+
 ## Scripts de operación
 
 - **`crea_vistas_viirs.sh`** — Procesamiento automático de productos VIIRS recientes (CLAVRX, ACSPO, Fire). Busca archivos `.tif` modificados en la última hora, aplica la paleta correcta para cada producto y genera imágenes JPEG con overlays de capas y logo.

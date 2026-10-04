@@ -457,11 +457,13 @@ def find_logo_dir():
 
     En desarrollo están junto a este archivo; instalado, pip deja el módulo en el
     venv y los fuentes en /opt/lanot-tools/src (install.sh copia el repo entero).
-    LANOT_LOGOS_MG manda sobre todo.
+    LANOT_LOGOS_MG manda sobre todo; LANOT_DIR sustituye a /usr/local/share/lanot.
     """
     here = os.path.dirname(os.path.abspath(__file__))
     for d in (os.environ.get('LANOT_LOGOS_MG'), os.path.join(here, 'logos'),
-              '/opt/lanot-tools/src/logos', '/usr/local/share/lanot/logos'):
+              '/opt/lanot-tools/src/logos',
+              os.path.join(os.environ.get('LANOT_DIR') or '/usr/local/share/lanot',
+                           'logos')):
         if d and all(os.path.isfile(os.path.join(d, f)) for f in LOGO_FILES):
             return d
     return None
