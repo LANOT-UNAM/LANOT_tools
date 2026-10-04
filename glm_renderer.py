@@ -583,10 +583,11 @@ if __name__ == '__main__':
                                  base_color=COLOR_MAP[args.color])
     if glm_layer is None:
         print("No se generó capa GLM. Guardando imagen base sin cambios.")
-        base_img.save(args.output)
+        base_img.save(args.output, compress_level=1)
     else:
         result = Image.alpha_composite(base_img, glm_layer)
-        result.save(args.output)
+        # zlib nivel 1 (el de hpsv), como mapdrawer; Pillow lo ignora en JPEG.
+        result.save(args.output, compress_level=1)
         print(f"Guardado: {args.output}")
         if 'glm_time_start' in metadata:
             print(f"Rango GLM: {metadata['glm_time_start']} – {metadata['glm_time_end']}")

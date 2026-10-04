@@ -355,5 +355,6 @@ if __name__ == '__main__':
                 for band_idx in range(3):
                     dst.write(result_arr[:, :, band_idx], band_idx + 1)
     else:
-        result.save(args.output)
+        # zlib nivel 1 (el de hpsv), como mapdrawer; Pillow lo ignora en JPEG.
+        result.save(args.output, compress_level=1)
     print(f"Guardado: {args.output}")
