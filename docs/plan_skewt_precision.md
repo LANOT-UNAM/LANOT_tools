@@ -157,3 +157,23 @@ Implementado como: `TOL_CM` y `_decimals()` de módulo; `self.dec_x`/`dec_y` en
 `SkewT._xy()`; `_polys(..., clip=True)` quita los puntos consecutivos que
 redondean igual y descarta la polilínea si queda de uno. 14 pruebas nuevas en
 `tests/test_skewt.py` (sección "precisión de lo emitido").
+
+## Confirmado en operación (2026-10-04, tahan)
+
+El `.sif` con `094db73` entró el 2026-10-01 a las 15:50. En
+`/data/output/jpss/vistas/sounder/skewt` (sin `--keep-mg`, así que se compara
+el SVG que produce `mg`, no el `.mg`):
+
+| | antes | después |
+|---|---|---|
+| SVG, promedio de los 14 sitios | ~79.1 KB (n=275) | **~70.7 KB** (n=74, −11 %) |
+| CDMX, NOAA-21 (01-oct 19:40 vs 03-oct 19:03) | 78 708 bytes | 70 331 bytes |
+| isotermas (`#4682B4`) en ese par | 18 trazos, 508 puntos | 18 trazos, **36 puntos** |
+| resto de los trazos | — | idénticos en número y puntos |
+
+La reducción del SVG es menor que la del `.mg` (−19 %) porque el SVG también
+lleva texto y estilos, y `mg` reescribe las coordenadas en unidades de página
+con su propia precisión: los 2/4 decimales no se ven ahí. En las curvas de
+fondo (iguales en los dos), la desviación mediana de cada punto respecto a sus
+vecinos en el 40 % superior bajó de ~0.10 a 0.02–0.05 pt; a 8× las dos versiones
+se ven lisas.
