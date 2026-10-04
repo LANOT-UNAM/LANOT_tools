@@ -607,16 +607,26 @@ class MapDrawer:
 
         full_path = os.path.join(self.lanot_dir, vector_rel_path)
 
-        # Cache: guardar como tupla (path, layer) para GeoPackage
-        cache_key = (full_path, layer) if layer else full_path
+        # Solo las geometrías cuyo recuadro toca el de la imagen (con el
+        # margen de _draw_path): las demás no dibujarían ningún punto. El
+        # índice espacial del gpkg las descarta sin leerlas; con límites
+        # invertidos (antimeridiano) no se filtra.
+        b = self.bounds
+        margin = 5.0
+        bbox = None
+        if b['ulx'] < b['lrx'] and b['lry'] < b['uly']:
+            bbox = (b['ulx'] - margin, b['lry'] - margin,
+                    b['lrx'] + margin, b['uly'] + margin)
+
+        # Cache: (path, layer, bbox); el recuadro cambia con crop()
+        cache_key = (full_path, layer, bbox)
 
         if cache_key not in self._shp_cache:
             try:
                 debug_msg(f"Cargando vectorial: {full_path}")
-                # Fiona abre con context manager, pero guardaremos features en cache
                 with fiona.open(full_path, layer=layer) as src:
-                    # Guardar todas las geometrías en memoria
-                    self._shp_cache[cache_key] = [feature for feature in src]
+                    feats = src.filter(bbox=bbox) if bbox else src
+                    self._shp_cache[cache_key] = list(feats)
             except Exception as e:
                 print(f"Error leyendo archivo vectorial {full_path}: {e}")
                 return
@@ -648,7 +658,7 @@ class MapDrawer:
                 continue
 
             for path in paths:
-                self._draw_path(draw, path, color, line_width)
+                self._draw_path(draw, path, color, line_width, margin)
 
     # --- Nueva API basada en nombres de capa ---
     def add_layer(self, key, rel_path):
