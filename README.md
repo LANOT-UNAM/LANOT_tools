@@ -26,6 +26,20 @@ Instala en `/opt/lanot-tools/` con virtualenv aislado y crea comandos globales e
 - `geotiff2view` - Conversión GeoTIFF a imagen
 - `mapdrawer` - Post-procesamiento de imágenes
 
+**Recursos compartidos** (CPT, logos, recortes): el repo es la fuente y
+`recursos.sha256` dice qué va en `/usr/local/share/lanot` y con qué contenido.
+
+```bash
+./install.sh --verifica             # compara lo instalado con el repo; no cambia nada
+sudo ./install.sh --solo-recursos   # actualiza solo CPT, logos y recortes, sin recrear el venv
+./genera_manifiesto.sh              # tras cambiar una CPT, un logo, los recortes o un gpkg
+```
+
+Si un archivo instalado difiere del repo, `install.sh` lo respalda como
+`<archivo>.bak-<fecha>` antes de reemplazarlo. Lo que solo existe en el servidor
+no se toca. Los gpkg no están en el repo: se copian a mano, y `--verifica` avisa
+si un servidor tiene otros.
+
 **Desinstalar:**
 ```bash
 sudo ./uninstall.sh
@@ -378,7 +392,7 @@ Después de la instalación se crean:
 - Ejecutables: `/opt/lanot-tools/venv/`
 - Comandos globales: `/usr/local/bin/{geotiff2view,mapdrawer}`
 - Paletas CPT: `/usr/local/share/lanot/colortables/`
-- Capas vectoriales: `/usr/local/share/lanot/gpkg/`
+- Capas vectoriales: `/usr/local/share/lanot/gpkg/` (se copian a mano; ver arriba)
 - Logos: `/usr/local/share/lanot/logos/`
 - Recortes: `/usr/local/share/lanot/docs/recortes_coordenadas.csv`
 
@@ -423,6 +437,7 @@ LANOT_tools/
 ├── tests/                   # pytest; tests/data con Items de hpsv y esquemas de STAC
 ├── setup.py                 # Configuración pip
 ├── install.sh / uninstall.sh
+├── recursos.sha256 / genera_manifiesto.sh   # recursos de /usr/local/share/lanot
 └── README.md
 ```
 

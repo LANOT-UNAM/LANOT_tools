@@ -14,12 +14,6 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Verificar que se ejecuta como root
-if [ "$EUID" -ne 0 ]; then 
-    echo -e "${RED}Error: Este script debe ejecutarse como root (use sudo)${NC}"
-    exit 1
-fi
-
 # Configuración
 INSTALL_DIR="/opt/lanot-tools"
 VENV_DIR="${INSTALL_DIR}/venv"
@@ -27,13 +21,111 @@ SRC_DIR="${INSTALL_DIR}/src"
 BIN_WRAPPER_MD="/usr/local/bin/mapdrawer"
 BIN_WRAPPER_G2V="/usr/local/bin/geotiff2view"
 BIN_WRAPPER_SKT="/usr/local/bin/skewt"
-SHARE_DIR="/usr/local/share/lanot"
-CPT_DIR="${SHARE_DIR}/colortables"
-LOGO_DIR="${SHARE_DIR}/logos"
-DOCS_DIR="${SHARE_DIR}/docs"
+# LANOT_DIR: la misma variable que leen las herramientas (sudo la descarta
+# salvo con -E; sirve sobre todo para --verifica y para los tests).
+SHARE_DIR="${LANOT_DIR:-/usr/local/share/lanot}"
 
 # Directorio del script (donde está el código fuente)
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# Recursos compartidos: recursos.sha256 (lo genera genera_manifiesto.sh) dice
+# qué archivo va en qué ruta de SHARE_DIR y con qué contenido. El repo es la
+# fuente: antes las CPT, logos, recortes y gpkg se copiaban a mano a cada
+# servidor y se desviaban.
+MANIFIESTO="${SCRIPT_DIR}/recursos.sha256"
+
+# Archivo del repo que se instala en la ruta relativa $1, o nada si no está en
+# el repo (los gpkg: se copian a mano y aquí solo se verifican).
+fuente_de() {
+    case "$1" in
+        colortables/*|logos/*) echo "${SCRIPT_DIR}/$1" ;;
+        docs/recortes_coordenadas.csv) echo "${SCRIPT_DIR}/recortes/recortes_coordenadas.csv" ;;
+        *) echo "" ;;
+    esac
+}
+
+# Compara SHARE_DIR con el manifiesto sin tocar nada. Devuelve 1 si algo falta
+# o difiere. Lo que sobra en colortables/ solo se avisa: puede ser local.
+verifica_recursos() {
+    local ok=0 mal=0 suma rel dest real nota
+    while read -r suma rel; do
+        dest="${SHARE_DIR}/${rel}"
+        nota=""
+        [ -z "$(fuente_de "$rel")" ] && nota=" (no está en el repo: se copia a mano)"
+        if [ ! -f "$dest" ]; then
+            echo -e "  ${RED}FALTA${NC}    ${rel}${nota}"
+            mal=$((mal + 1))
+        else
+            real=$(sha256sum "$dest" | cut -d' ' -f1)
+            if [ "$real" != "$suma" ]; then
+                echo -e "  ${RED}DIFIERE${NC}  ${rel}${nota}"
+                mal=$((mal + 1))
+            else
+                ok=$((ok + 1))
+            fi
+        fi
+    done < "${MANIFIESTO}"
+    if [ -d "${SHARE_DIR}/colortables" ]; then
+        for f in "${SHARE_DIR}"/colortables/*; do
+            [ -e "$f" ] || continue
+            rel="colortables/$(basename "$f")"
+            case "$rel" in *.bak-*) continue ;; esac
+            if ! cut -d' ' -f3- "${MANIFIESTO}" | grep -qxF -- "$rel"; then
+                echo -e "  ${YELLOW}SOBRA${NC}    ${rel} (no está en el repo; no se toca)"
+            fi
+        done
+    fi
+    echo "  ${ok} iguales al repo, ${mal} faltan o difieren (${SHARE_DIR})"
+    [ "$mal" -eq 0 ]
+}
+
+# Copia al SHARE_DIR lo que el manifiesto dice que está en el repo; lo que
+# difiere se respalda como <archivo>.bak-<fecha> antes de reemplazarlo.
+instala_recursos() {
+    local STAMP _nuevos _reemplazados _iguales _suma _rel _src _dest
+    STAMP=$(date +%Y%m%d-%H%M%S)
+    _nuevos=0; _reemplazados=0; _iguales=0
+    while read -r _suma _rel; do
+        _src=$(fuente_de "${_rel}")
+        [ -n "${_src}" ] || continue
+        _dest="${SHARE_DIR}/${_rel}"
+        mkdir -p "$(dirname "${_dest}")"
+        if [ ! -e "${_dest}" ]; then
+            cp "${_src}" "${_dest}"
+            _nuevos=$((_nuevos + 1))
+        elif cmp -s "${_src}" "${_dest}"; then
+            _iguales=$((_iguales + 1))
+        else
+            cp -p "${_dest}" "${_dest}.bak-${STAMP}"
+            cp "${_src}" "${_dest}"
+            echo "  - ${_rel} difería: respaldo en $(basename "${_dest}").bak-${STAMP}"
+            _reemplazados=$((_reemplazados + 1))
+        fi
+    done < "${MANIFIESTO}"
+    echo "  ✓ Recursos en ${SHARE_DIR}: ${_nuevos} nuevos, ${_reemplazados} reemplazados, ${_iguales} sin cambio"
+}
+
+if [ "${1:-}" = "--verifica" ]; then
+    echo -e "${GREEN}=== Recursos de LANOT_tools contra recursos.sha256 ===${NC}"
+    verifica_recursos
+    exit $?
+elif [ "${1:-}" = "--solo-recursos" ]; then
+    echo -e "${GREEN}=== Recursos de LANOT_tools (sin tocar el código ni el venv) ===${NC}"
+    instala_recursos
+    verifica_recursos
+    exit $?
+elif [ -n "${1:-}" ]; then
+    echo "Uso: sudo ./install.sh            instala"
+    echo "     sudo ./install.sh --solo-recursos   instala solo CPT, logos y recortes"
+    echo "     ./install.sh --verifica      compara los recursos instalados con el repo"
+    exit 2
+fi
+
+# Verificar que se ejecuta como root
+if [ "$EUID" -ne 0 ]; then
+    echo -e "${RED}Error: Este script debe ejecutarse como root (use sudo)${NC}"
+    exit 1
+fi
 
 echo -e "${GREEN}=== Instalación de LANOT_tools ===${NC}"
 echo ""
@@ -64,46 +156,24 @@ cp -r "${SCRIPT_DIR}" "${SRC_DIR}"
 rm -rf "${SRC_DIR}/.git" "${SRC_DIR}/__pycache__" "${SRC_DIR}"/*.pyc "${SRC_DIR}"/build "${SRC_DIR}"/*.egg-info
 echo "  ✓ Código fuente copiado a ${SRC_DIR}"
 
-# Paso 4: Instalar recursos (CPTs)
+# Paso 4: Instalar recursos compartidos según recursos.sha256
 echo -e "${YELLOW}[4/7] Instalando recursos compartidos...${NC}"
-mkdir -p "${CPT_DIR}"
-if ls "${SCRIPT_DIR}/colortables/"*.cpt >/dev/null 2>&1; then
-    cp "${SCRIPT_DIR}/colortables/"*.cpt "${CPT_DIR}/"
-    echo "  ✓ Tablas de color (.cpt) copiadas desde colortables/ a ${CPT_DIR}"
-else
-    echo "  - No se encontraron archivos .cpt en colortables/, omitiendo copia."
-fi
-
-# Recortes geograficos (clave -> ULX,ULY,LRX,LRY). Lo leen mapdrawer y hpsv
-# (hpsatviews/include/clip_loader.h), los dos con esta ruta escrita en el
-# codigo. Antes vivia solo a mano en cada servidor y se desvio: el
-# 2026-09-23 kawak no tenia `ash` y A6 traia la misma latitud arriba y abajo.
-# Se sobrescribe: el repo es la fuente, no se edita en el servidor.
-mkdir -p "${DOCS_DIR}"
-if [ -f "${SCRIPT_DIR}/recortes/recortes_coordenadas.csv" ]; then
-    cp "${SCRIPT_DIR}/recortes/recortes_coordenadas.csv" "${DOCS_DIR}/"
-    echo "  ✓ Recortes (recortes_coordenadas.csv) copiados a ${DOCS_DIR}"
-fi
-
-# Logos: SOLO la salida vectorial (.svg y .pdf). Los `.mg` son el FUENTE y se
-# quedan en el repo: quien quiera otro tamaño o una variante recompila ahí con
-# `mg`, que además necesita `lanot_sat.mg` al lado. Aquí solo va lo que consume
-# quien inserta el logo en un documento.
-#
-# ⚠ Este directorio NO es nuestro en exclusiva: ya vive ahí el juego de logos
-# oficiales en PNG/JPG. Se COPIA encima, nunca se limpia el directorio.
-mkdir -p "${LOGO_DIR}"
-_logos=0
-for ext in svg pdf; do
-    if ls "${SCRIPT_DIR}/logos/"*.${ext} >/dev/null 2>&1; then
-        cp "${SCRIPT_DIR}/logos/"*.${ext} "${LOGO_DIR}/"
-        _logos=1
-    fi
-done
-if [ "${_logos}" -eq 1 ]; then
-    echo "  ✓ Logos vectoriales (.svg/.pdf) copiados a ${LOGO_DIR}"
-else
-    echo "  - No se encontraron .svg/.pdf en logos/, omitiendo copia."
+# - CPT, recortes y logos: se copian del repo. Si el instalado difiere, se
+#   respalda como <archivo>.bak-<fecha> antes de reemplazarlo: el repo manda,
+#   pero un cambio hecho a mano en el servidor no se pierde.
+# - recortes_coordenadas.csv lo leen mapdrawer y hpsv
+#   (hpsatviews/include/clip_loader.h), los dos con esta ruta en el código.
+#   El 2026-09-23 kawak no tenía `ash` y A6 traía la misma latitud arriba y
+#   abajo: por eso se instala desde aquí y no se edita en el servidor.
+# - logos/: solo lo que lista el manifiesto (.svg/.pdf y los .png que leen
+#   las herramientas). Los .mg son el FUENTE y se quedan en el repo.
+#   ⚠ Ese directorio NO es nuestro en exclusiva: ahí vive el juego de logos
+#   oficiales en PNG/JPG. Se copia encima, nunca se limpia.
+# - gpkg: no están en el repo; solo se verifican abajo.
+instala_recursos
+if ! verifica_recursos; then
+    echo -e "${YELLOW}  Aviso: los recursos instalados no coinciden con recursos.sha256 (arriba).${NC}"
+    echo "  Si son gpkg, cópialos a mano; si es otro archivo, corre ./genera_manifiesto.sh."
 fi
 
 # Paso 5: Crear/actualizar virtualenv
