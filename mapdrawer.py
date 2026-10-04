@@ -35,6 +35,7 @@ Image.MAX_IMAGE_PIXELS = None
 # Intentamos importar rasterio para lectura de metadatos GeoTIFF
 try:
     import rasterio
+    import rasterio.windows
     HAS_RASTERIO = True
 except ImportError:
     HAS_RASTERIO = False
@@ -165,6 +166,72 @@ GOES_CONUS_EXTENT_METERS = {
 
 # Directorio global de recursos (instalación estándar)
 GLOBAL_LANOT_DIR = "/usr/local/share/lanot"
+
+
+class LazyGeoTIFF:
+    """GeoTIFF con tamaño conocido y píxeles sin leer, para --clip.
+
+    MapDrawer.crop() solo necesita width/height para pasar el recorte a
+    píxeles; aquí crop() lee de disco solo esa ventana. En un disco completo
+    de hpsv (8978×8973, tiles de 512) son ~0.05 s contra ~2.3 s de leerlo
+    entero con PIL para tirar casi todo. Los píxeles son los de
+    Image.open(path).convert('RGB'), por eso open() solo acepta lo que PIL
+    lee como muestras crudas: uint8 gris o RGB(A), sin paleta. El modo se
+    toma de la cabecera que lee PIL, no de rasterio: hpsv escribe
+    PhotometricInterpretation=RGB y GDAL aun así reporta las bandas como
+    'undefined'.
+    """
+
+    # (modo de PIL, PhotometricInterpretation, ExtraSamples) aceptados:
+    # gris con 0=negro, RGB, y RGBA con alfa no premultiplicado.
+    _ACCEPTED = {('L', 1, None), ('RGB', 2, None), ('RGBA', 2, 2), ('RGBA', 2, (2,))}
+
+    def __init__(self, path, width, height, mode):
+        self.path = path
+        self.width = width
+        self.height = height
+        self.mode = mode
+
+    @property
+    def size(self):
+        return (self.width, self.height)
+
+    @classmethod
+    def open(cls, path):
+        """LazyGeoTIFF de path, o None si hay que leerlo con PIL."""
+        if not HAS_RASTERIO:
+            return None
+        try:
+            with Image.open(path) as im:  # solo la cabecera
+                tags = getattr(im, 'tag_v2', {})
+                key = (im.mode, tags.get(262), tags.get(338))
+                if key not in cls._ACCEPTED:
+                    debug_msg(f"LazyGeoTIFF: {key} no aceptado; se lee completo")
+                    return None
+                mode, size = im.mode, im.size
+            with rasterio.open(path) as src:
+                if (src.count != len(mode) or set(src.dtypes) != {'uint8'}
+                        or (src.width, src.height) != size):
+                    return None
+                return cls(path, src.width, src.height, mode)
+        except Exception as e:
+            debug_msg(f"LazyGeoTIFF: se lee completo con PIL ({e})")
+            return None
+
+    def crop(self, box):
+        left, upper, right, lower = box
+        window = rasterio.windows.Window(left, upper, right - left, lower - upper)
+        with rasterio.open(self.path) as src:
+            arr = src.read(window=window)
+        debug_msg(f"LazyGeoTIFF: ventana {box} de {self.size}")
+        if self.mode == 'L':
+            img = Image.fromarray(arr[0], 'L')
+        else:
+            img = Image.fromarray(np.moveaxis(arr, 0, -1), self.mode)
+        return img.convert('RGB')
+
+    def load(self):
+        return self.crop((0, 0, self.width, self.height))
 
 
 def resolve_cpt_path(cpt_path):
@@ -1480,12 +1547,20 @@ def main():
         if metadata.get('crs') and metadata.get('bounds') is not None:
             stac_input_grid = (metadata['crs'], tuple(metadata['bounds']))
 
-    try:
-        img = Image.open(args.input_image).convert(
-            "RGB")  # Asegurar RGB para dibujar
-    except Exception as e:
-        print(f"Error abriendo imagen: {e}", file=sys.stderr)
-        sys.exit(1)
+    # Con --clip sobre un GeoTIFF basta leer la ventana del recorte (ver
+    # LazyGeoTIFF). --scale, --lat-south y --o_crs transforman la imagen
+    # entera antes del recorte, así que con ellos se lee completa.
+    img = None
+    if (args.clip and _input_ext in ('.tif', '.tiff') and not args.scale
+            and args.lat_south is None and not getattr(args, 'o_crs', None)):
+        img = LazyGeoTIFF.open(args.input_image)
+    if img is None:
+        try:
+            img = Image.open(args.input_image).convert(
+                "RGB")  # Asegurar RGB para dibujar
+        except Exception as e:
+            print(f"Error abriendo imagen: {e}", file=sys.stderr)
+            sys.exit(1)
 
     if args.scale and args.outsize:
         print("Error: --scale y --outsize son mutuamente excluyentes.", file=sys.stderr)
@@ -1608,6 +1683,10 @@ def main():
             else:
                 print(
                     f"Error: Región de recorte '{args.clip}' no encontrada.", file=sys.stderr)
+
+    # Si el recorte no se hizo (región inválida o vacía), la imagen completa
+    if isinstance(mapper.image, LazyGeoTIFF):
+        mapper.set_image(mapper.image.load())
 
     # 4b. Redimensionar a tamaño absoluto post-recorte
     if args.outsize:

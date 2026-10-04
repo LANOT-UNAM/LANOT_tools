@@ -9,6 +9,7 @@ Cubre:
   y compone la capa sobre self.image
 - CLI --metadata: sólo acepta el Item de STAC de hpsv y falla en voz alta
 - calculate_size / layer_width: < 1 es fracción del ancho, >= 1 píxeles
+- LazyGeoTIFF: --clip lee solo la ventana y da los mismos píxeles que PIL
 """
 
 import json
@@ -21,7 +22,8 @@ import pytest
 from PIL import Image
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from mapdrawer import MapDrawer, make_south_room, calculate_size, layer_width
+from mapdrawer import (MapDrawer, LazyGeoTIFF, make_south_room, calculate_size,
+                       layer_width)
 from metadata import Metadata
 
 
@@ -521,3 +523,92 @@ class TestLayerWidth:
              '--layer', 'COASTLINE:white:0.5', '-o', str(tmp_path / 'out.png')],
             capture_output=True, text=True, timeout=120)
         assert 'Advertencia' in r.stderr and '0.5' in r.stderr
+
+
+# ---------------------------------------------------------------------------
+# LazyGeoTIFF: --clip lee solo la ventana
+# ---------------------------------------------------------------------------
+
+def _write_geotiff(path, arr, **profile):
+    """GeoTIFF en 4326 sobre (-120, 10, -80, 40), en tiles de 16 como los de
+    hpsv (512) para que la lectura por ventana cruce bordes de tile."""
+    import rasterio
+    from rasterio.transform import from_bounds
+    count, h, w = arr.shape
+    opts = dict(driver='GTiff', width=w, height=h, count=count, dtype='uint8',
+                crs='EPSG:4326', transform=from_bounds(-120, 10, -80, 40, w, h),
+                tiled=True, blockxsize=16, blockysize=16, compress='deflate')
+    opts.update(profile)
+    colormap = opts.pop('colormap', None)
+    with rasterio.open(path, 'w', **opts) as dst:
+        dst.write(arr)
+        if colormap:
+            dst.write_colormap(1, colormap)
+
+
+class TestLazyGeoTIFF:
+    BOX = (13, 7, 61, 45)  # no alineada a los tiles de 16
+
+    @pytest.fixture
+    def rng(self):
+        return np.random.default_rng(0)
+
+    def test_rgb_window_matches_pil(self, tmp_path, rng):
+        path = tmp_path / 'rgb.tif'
+        _write_geotiff(path, rng.integers(0, 256, (3, 60, 80), dtype=np.uint8),
+                       photometric='RGB')
+        lazy = LazyGeoTIFF.open(str(path))
+        assert lazy is not None and lazy.size == (80, 60)
+        expected = Image.open(path).convert('RGB').crop(self.BOX)
+        got = lazy.crop(self.BOX)
+        assert got.mode == 'RGB'
+        assert np.array_equal(np.array(got), np.array(expected))
+
+    def test_gray_window_matches_pil(self, tmp_path, rng):
+        path = tmp_path / 'gray.tif'
+        _write_geotiff(path, rng.integers(0, 256, (1, 60, 80), dtype=np.uint8))
+        lazy = LazyGeoTIFF.open(str(path))
+        assert lazy is not None
+        expected = Image.open(path).convert('RGB').crop(self.BOX)
+        assert np.array_equal(np.array(lazy.crop(self.BOX)), np.array(expected))
+
+    def test_palette_falls_back_to_pil(self, tmp_path, rng):
+        """Con paleta (PIL modo P) convert('RGB') aplica colores que la
+        ventana cruda no tiene: se lee completo con PIL."""
+        path = tmp_path / 'pal.tif'
+        _write_geotiff(path, rng.integers(0, 4, (1, 60, 80), dtype=np.uint8),
+                       photometric='PALETTE',
+                       colormap={i: (60 * i, 0, 0, 255) for i in range(4)})
+        assert Image.open(path).mode == 'P'
+        assert LazyGeoTIFF.open(str(path)) is None
+
+    def test_colormap_on_gray_matches_pil(self, tmp_path, rng):
+        """GDAL por omisión guarda la tabla con Photometric=MinIsBlack: PIL la
+        ignora y lee gris, y la ventana tiene que dar lo mismo."""
+        path = tmp_path / 'cmap.tif'
+        _write_geotiff(path, rng.integers(0, 4, (1, 60, 80), dtype=np.uint8),
+                       colormap={i: (60 * i, 0, 0, 255) for i in range(4)})
+        lazy = LazyGeoTIFF.open(str(path))
+        assert lazy is not None
+        expected = Image.open(path).convert('RGB').crop(self.BOX)
+        assert np.array_equal(np.array(lazy.crop(self.BOX)), np.array(expected))
+
+    def test_cli_clip_same_pixels_as_png(self, tmp_path, rng):
+        """El mismo --clip sobre el GeoTIFF (ventana) y sobre un PNG con
+        --bounds (lectura completa) da la misma imagen."""
+        arr = rng.integers(0, 256, (3, 60, 80), dtype=np.uint8)
+        tif = tmp_path / 'img.tif'
+        _write_geotiff(tif, arr, photometric='RGB')
+        png = tmp_path / 'img.png'
+        Image.fromarray(np.moveaxis(arr, 0, -1), 'RGB').save(png)
+        clip = '--clip=-110,35,-90,20'
+        for src, extra in ((tif, []), (png, ['--bounds=-120,40,-80,10'])):
+            r = subprocess.run(
+                [sys.executable, MAPDRAWER, str(src), clip, *extra,
+                 '-o', str(tmp_path / (src.stem + src.suffix[1:] + '.png'))],
+                capture_output=True, text=True, timeout=120)
+            assert r.returncode == 0, r.stderr
+        a = np.array(Image.open(tmp_path / 'imgtif.png'))
+        b = np.array(Image.open(tmp_path / 'imgpng.png'))
+        assert a.shape == (30, 40, 3)
+        assert np.array_equal(a, b)

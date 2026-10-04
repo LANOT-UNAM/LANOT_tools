@@ -42,7 +42,7 @@ sudo /opt/lanot-tools/venv/bin/pip install pytest
 /opt/lanot-tools/venv/bin/python -m pytest tests/
 ```
 
-Expected on a healthy checkout: **363 passed, 0 skipped** (323 medidas el 2026-09-26 con `python3` del sistema, que trae pytest, jsonschema y las dependencias de ejecución, tras añadir `--stac`; +14 de la precisión del Skew-T y +26 de `test_sintaxis_py39.py` el 2026-10-01, verificadas sin `test_stac_item.py`: 342 passed). Conteos anteriores —323 el 2026-09-26, 265 el 2026-09-12, 224 el 2026-08-30; 114 passed, 33 skipped antes— ya no aplican: aquellos saltos eran por datos de muestra ausentes, no por dependencias. `tests/test_stac_item.py` necesita además `jsonschema` (con `referencing`), que tampoco está en el venv del servidor.
+Expected on a healthy checkout: **368 passed, 0 skipped** (+5 de `LazyGeoTIFF` el 2026-10-04, verificadas sin `test_stac_item.py`: 348 passed; 323 medidas el 2026-09-26 con `python3` del sistema, que trae pytest, jsonschema y las dependencias de ejecución, tras añadir `--stac`; +14 de la precisión del Skew-T y +26 de `test_sintaxis_py39.py` el 2026-10-01, verificadas sin `test_stac_item.py`: 342 passed). Conteos anteriores —323 el 2026-09-26, 265 el 2026-09-12, 224 el 2026-08-30; 114 passed, 33 skipped antes— ya no aplican: aquellos saltos eran por datos de muestra ausentes, no por dependencias. `tests/test_stac_item.py` necesita además `jsonschema` (con `referencing`), que tampoco está en el venv del servidor.
 
 El contenedor de polar2grid corre **Python 3.9**. `tests/test_sintaxis_py39.py` rechaza los f-strings que solo valen desde 3.12 (salto de línea dentro de `{…}`, comillas iguales anidadas): con un intérprete moderno compilan y pasan todo, y en el `.sif` son un `SyntaxError` al importar.
 
