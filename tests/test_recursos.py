@@ -111,5 +111,21 @@ class TestInstallSh:
         assert (tmp_path / 'colortables' / 'sst.cpt').read_text() == '# otra\n'
         assert sorted(p.name for p in tmp_path.rglob('*')) == antes
 
+    def test_reinstall_without_cmp_backs_up_nothing(self, tmp_path):
+        """La imagen base del .sif de polar2grid no trae cmp (diffutils): una
+        segunda instalación no puede tomar todo por distinto y respaldarlo."""
+        share = tmp_path / 'share'
+        _install(share, '--solo-recursos')
+        fake = tmp_path / 'bin'
+        fake.mkdir()
+        (fake / 'cmp').write_text('#!/bin/sh\nexit 2\n')
+        (fake / 'cmp').chmod(0o755)
+        env = dict(os.environ, LANOT_DIR=str(share),
+                   PATH=f"{fake}{os.pathsep}{os.environ['PATH']}")
+        r = subprocess.run(['bash', INSTALL, '--solo-recursos'], env=env,
+                           capture_output=True, text=True, timeout=120)
+        assert '0 nuevos, 0 reemplazados' in r.stdout
+        assert not list(share.rglob('*.bak-*'))
+
     def test_unknown_option_exits_2(self, tmp_path):
         assert _install(tmp_path, '--no-existe').returncode == 2

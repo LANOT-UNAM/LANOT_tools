@@ -93,7 +93,9 @@ instala_recursos() {
         if [ ! -e "${_dest}" ]; then
             cp "${_src}" "${_dest}"
             _nuevos=$((_nuevos + 1))
-        elif cmp -s "${_src}" "${_dest}"; then
+        # sha256sum y no cmp: cmp viene en diffutils, que la imagen base Rocky 9
+        # del .sif de polar2grid no trae; sin él todo saldría "difería".
+        elif [ "$(sha256sum "${_dest}" | cut -d' ' -f1)" = "${_suma}" ]; then
             _iguales=$((_iguales + 1))
         else
             cp -p "${_dest}" "${_dest}.bak-${STAMP}"
