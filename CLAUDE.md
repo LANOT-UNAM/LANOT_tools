@@ -48,6 +48,10 @@ El contenedor de polar2grid corre **Python 3.9**. `tests/test_sintaxis_py39.py` 
 
 Los tests del Skew-T que compilan un `.mg` se saltan solos si `mg` no está en el PATH; los del lector NUCAPS, si falta `netCDF4`.
 
+## Estado y pendientes (2026-10-04)
+
+`docs/rendimiento_mapdrawer.md`: lo que se midió y cambió en el rendimiento de mapdrawer, lo que se decidió no hacer (reemplazar Pillow, varios recortes por corrida), el manejo de recursos con `recursos.sha256`, y el estado del despliegue en kawak/tahan. Dos pendientes: **decidir si los gpkg entran al repo**, y **verificar la primera pasada polar con el `.sif` en `fa99373`** (la lista está en `LANOT_procesamiento_polar/docs/estado_y_pendientes.md`).
+
 ## Architecture
 
 The system has three CLI entry points and seven importable library modules:
