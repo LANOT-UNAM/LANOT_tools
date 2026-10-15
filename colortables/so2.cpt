@@ -1,0 +1,27 @@
+# so2.cpt
+# Columna vertical de SO2 de Sentinel-5P TROPOMI (L2 SO2 -> HARP bin_spatial),
+# producto diario sobre Villarrica de lanot-chile, en DU (1 DU = 4.4615e-4 mol/m2).
+# Rango fijo, no percentiles, para que dos dias se puedan comparar. Sale de la
+# escala fija de 0 a 0.01 mol/m2 (22.4 DU) con que lanot-chile pintaba con
+# matplotlib, redondeada a 0-20 DU en pasos de 2. La rampa es el jet de
+# matplotlib muestreado en esos pasos, para que la vista no cambie de aspecto.
+# El fondo sin pluma y el ruido negativo caen en el azul oscuro (B); arriba de
+# 20 DU, que es una erupcion y no desgasificacion, satura en guinda (F).
+# En DU y no en mol/m2 porque ColorPaletteTable trunca a entero los extremos
+# del rango: con 0.001-0.010 la paleta se colapsa en tres bandas planas.
+# UNIT = DU
+# COLOR_MODEL = RGB
+# Value R G B   Value R G B
+0     0   0 128    2     0   0 241
+2     0   0 241    4     0  76 255
+4     0  76 255    6     0 176 255
+6     0 176 255    8    41 255 206
+8    41 255 206    10  125 255 122
+10  125 255 122    12  206 255  41
+12  206 255  41    14  255 196   0
+14  255 196   0    16  255 104   0
+16  255 104   0    18  241   8   0
+18  241   8   0    20  128   0   0
+B     0   0 128
+F   128   0   0
+N     0   0   0
