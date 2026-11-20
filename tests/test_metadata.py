@@ -242,6 +242,25 @@ class TestEnrichFromFilename:
             assert m.get('units') == unidades, nombre
             assert m.get('sensor') == 'ATMS', nombre
 
+    def test_avhrr_metop(self):
+        # Nombres como los escriben run_polar2grid_avhrr.sh y geotiff2view (tahan, 2026-11-20)
+        casos = [
+            ('metopc_avhrr_band1_vis_20261120_152131_wgs84_geo_1000m.tif', 'Band 1 (0.63 µm)', '%', 'Metop-C'),
+            ('metopc_avhrr_band2_vis_20261120_152131_wgs84_geo_1000m.tif', 'Band 2 (0.86 µm)', '%', 'Metop-C'),
+            ('metopc_avhrr_band3a_vis_20261120_152131_wgs84_geo_1000m.tif', 'Band 3A (1.6 µm)', '%', 'Metop-C'),
+            ('metopb_avhrr_band3b_bt_20261120_023100_wgs84_geo_1000m.tif', 'Band 3B (3.7 µm)', 'K', 'Metop-B'),
+            ('metopb_avhrr_band4_bt_20261120_145951_wgs84_geo_1000m.tif', 'Band 4 (10.8 µm)', 'K', 'Metop-B'),
+            ('metopb_avhrr_band5_bt_20261120_145951_wgs84_geo_1000m.tif', 'Band 5 (12.0 µm)', 'K', 'Metop-B'),
+            ('rgb_metopc_avhrr_band1_2_3a_vis_20261120_152131_wgs84_geo_1000m.jpg', 'RGB 1-2-3a', None, 'Metop-C'),
+        ]
+        for nombre, producto, unidades, satelite in casos:
+            m = Metadata()
+            m.enrich_from_filename(nombre)
+            assert m.get('product') == producto, nombre
+            assert m.get('units') == unidades, nombre
+            assert m.get('satellite') == satelite, nombre
+            assert m.get('sensor') == 'AVHRR', nombre
+
     def test_generico_no_le_gana_a_los_de_nube(self):
         """El respaldo va al final de product_map a proposito."""
         m = Metadata()

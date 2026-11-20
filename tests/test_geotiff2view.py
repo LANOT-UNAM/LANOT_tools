@@ -18,7 +18,8 @@ import numpy as np
 import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from geotiff2view import SIN_DATOS_VALIDOS
+from geotiff2view import SIN_DATOS_VALIDOS, nombre_para_metadatos
+from metadata import Metadata
 
 rasterio = pytest.importorskip("rasterio")
 from rasterio.transform import from_origin
@@ -130,3 +131,30 @@ def test_con_datos_y_paleta_genera_imagen(tif_con_datos, tmp_path):
 
     assert r.returncode == 0
     assert os.path.exists(salida)
+
+
+# ---------------------------------------------------------------------------
+# Rótulo de un RGB de tres archivos
+# ---------------------------------------------------------------------------
+
+def test_rgb_toma_los_metadatos_del_compuesto():
+    # Como lo llama run_polar2grid_avhrr.sh (tahan, 2026-11-20). Antes se leía
+    # el nombre de la entrada, cuyo basename es el del tercer canal: el RGB
+    # salía rotulado "Band 3A (1.6 µm)".
+    canales = ['/tif/metopc_avhrr_band1_vis_20261120_152131_wgs84_geo_1000m.tif',
+               '/tif/metopc_avhrr_band2_vis_20261120_152131_wgs84_geo_1000m.tif',
+               '/tif/metopc_avhrr_band3a_vis_20261120_152131_wgs84_geo_1000m.tif']
+    compuesto = 'rgb_metopc_avhrr_band1_2_3a_vis_20261120_152131_wgs84_geo_1000m'
+
+    nombre = nombre_para_metadatos(','.join(canales), canales, compuesto)
+    assert nombre == compuesto
+
+    m = Metadata()
+    m.enrich_from_filename(nombre)
+    assert m.get('product') == 'RGB 1-2-3a'
+    assert m.get('satellite') == 'Metop-C'
+
+
+def test_un_archivo_conserva_la_ruta_completa():
+    entrada = '/data/vistas/sounder/noaa21_atms-cris_Temperature_497mb_20260630_184728_wgs84_geo_5km.tif'
+    assert nombre_para_metadatos(entrada, [entrada], 'x') == entrada

@@ -325,6 +325,19 @@ def load_geotiff(filepath, n_idx=None, f_idx=None, offset=0, scale_factor=1.0, r
 
         return img, metadata
 
+
+def nombre_para_metadatos(entrada, input_files, base_name):
+    """Nombre del que se sacan satélite, sensor y producto para el rótulo.
+
+    Con un archivo, la entrada tal cual (con directorio: product_map también
+    mira la ruta). Con tres, el nombre del compuesto que ya se armó para la
+    salida (rgb_metopc_avhrr_band1_2_3a_vis_…): el de un canal suelto
+    describe ese canal, no el RGB, y desde que product_map conoce las bandas
+    de AVHRR el RGB 1-2-3a salía rotulado con la banda 3A, que es la última
+    de la lista.
+    """
+    return base_name if len(input_files) > 1 else entrada
+
 def main():
     global VERBOSE
     parser = argparse.ArgumentParser(
@@ -700,7 +713,8 @@ def main():
                     if ts_pos is None: ts_pos = 2
                 elif ts_pos is not None:
                     # Completar metadatos faltantes desde el nombre del archivo
-                    metadata.enrich_from_filename(args.input)
+                    metadata.enrich_from_filename(
+                        nombre_para_metadatos(args.input, input_files, base_name))
                     # En modo RGB, ignorar banda detectada y usar 'RGB' si no hay producto definido
                     if len(input_files) == 3:
                         metadata.pop('band', None)
@@ -778,7 +792,8 @@ def main():
     if args.stac:
         import stac_item
         stac_meta = Metadata.from_dict(metadata.to_dict())
-        stac_meta.enrich_from_filename(primary_input)
+        stac_meta.enrich_from_filename(
+            nombre_para_metadatos(primary_input, input_files, base_name))
         if len(input_files) == 3:
             stac_meta.pop('band', None)
             if not stac_meta.get('product'):

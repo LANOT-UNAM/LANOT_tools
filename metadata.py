@@ -454,6 +454,19 @@ class Metadata:
             product_map = [
                 ('true_color',       'True Color',           None),
                 ('false_color',      'Day Land Cloud Fire',  None),
+                # AVHRR de METOP, con los nombres de Polar2Grid (lector
+                # avhrr_l1b_aapp): metopc_avhrr_band4_bt_..., y el RGB que apila
+                # geotiff2view, rgb_metopc_avhrr_band1_2_3a_vis_... Sin estas
+                # entradas la regla de 'band' rotulaba el RGB como "BAND1" y dejaba
+                # sin nada a 3a y 3b, que no son solo digitos. El RGB va primero:
+                # su nombre contiene 'band1_', no 'band1_vis'.
+                ('avhrr_band1_2_3a', 'RGB 1-2-3a',           None),
+                ('avhrr_band1_vis',  'Band 1 (0.63 µm)',     '%'),
+                ('avhrr_band2_vis',  'Band 2 (0.86 µm)',     '%'),
+                ('avhrr_band3a_vis', 'Band 3A (1.6 µm)',     '%'),
+                ('avhrr_band3b_bt',  'Band 3B (3.7 µm)',     'K'),
+                ('avhrr_band4_bt',   'Band 4 (10.8 µm)',     'K'),
+                ('avhrr_band5_bt',   'Band 5 (12.0 µm)',     'K'),
                 ('sst',              'SST',                  'K'),
                 ('cldtoptemp',       'Cloud Top Temp',       'K'),
                 ('cld_temp_acha',    'Cloud Top Temp',       'K'),
