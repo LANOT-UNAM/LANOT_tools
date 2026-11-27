@@ -91,6 +91,22 @@ def _quality_label(var, value):
         return 'accepted' if value == 0 else f'flag {value}'
 
 
+# Cómo escribe HEAP los instrumentos en el atributo global `instrument`, y cómo
+# se nombran en el resto de las vistas.
+_INSTRUMENTOS = {'AMSUA': 'AMSU-A', 'AMSU-A': 'AMSU-A', 'CRIS': 'CrIS',
+                 'ATMS': 'ATMS', 'IASI': 'IASI', 'MHS': 'MHS'}
+
+
+def _sensor_de(instrument):
+    """'IASI, AMSUA, MHS' → 'IASI+AMSU-A+MHS'. Sin atributo, el de JPSS: era
+    el único que había cuando se escribió esto, y el nombre de archivo de HEAP
+    no dice los instrumentos."""
+    if not instrument:
+        return 'CrIS+ATMS'
+    partes = [x.strip() for x in str(instrument).split(',') if x.strip()]
+    return '+'.join(_INSTRUMENTOS.get(x.upper(), x) for x in partes) or 'CrIS+ATMS'
+
+
 def _scan(paths):
     """Recorre los archivos y devuelve (rutas, lat, lon, índice global→(archivo, FOR))."""
     lats, lons, owner = [], [], []
@@ -171,6 +187,10 @@ def read_sounding(paths, lat=None, lon=None, max_dist_km=100.0,
         # El satélite, del propio archivo: HEAP nombra 'n21' a NOAA-21, que no es
         # el código de los SDR ('j02'), y del nombre salía solo "NOAA".
         platform = getattr(ds, 'platform', None)
+        # Los instrumentos, también del archivo: HEAP corre igual sobre CrIS+ATMS
+        # (JPSS, "CrIS, ATMS") que sobre IASI+AMSU-A+MHS (METOP, "IASI, AMSUA,
+        # MHS"), y el subtítulo de un Skew-T de METOP decía CrIS+ATMS.
+        sensor = _sensor_de(getattr(ds, 'instrument', None))
 
     # Niveles utilizables. En estos archivos los que están bajo la superficie ya
     # vienen como _FillValue, pero el filtro se queda: el mismo lector tiene que
@@ -217,7 +237,7 @@ def read_sounding(paths, lat=None, lon=None, max_dist_km=100.0,
         quality=quality, quality_label=quality_label,
         timestamp=timestamp,
         satellite=platform or meta.get('satellite', 'NOAA'),
-        sensor='CrIS+ATMS',       # todo NUCAPS-EDR lo es; no va en el nombre
+        sensor=sensor,
         source_file=path, for_index=i,
         n_files=len(paths),
     )
